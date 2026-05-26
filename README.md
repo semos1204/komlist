@@ -105,10 +105,62 @@ ID  STATUS  PRIO  TAGS            DUE         TITLE             UPDATED
 ```console
 $ kl list --status todo
 $ kl list --tag doc
+$ kl list --wide            # always show PRIO / TAGS / DUE columns
 $ kl list --sort priority   # high → medium → low → unset
 $ kl list --sort due        # earliest first, no-due last
 $ kl list --sort status
+$ kl list --sort urgency    # computed score: priority + due proximity + age
 ```
+
+The **urgency** score is a Taskwarrior-inspired heuristic: high priority,
+soon/overdue due dates and in-progress status push a task up; done and
+blocked tasks sink.
+
+### Notes
+
+```console
+$ kl note 1 "purge inactive accounts first"
+Note added: #1 (1 total)
+
+$ kl show 1            # full detail view, including notes
+$ kl note 1 --clear   # drop all notes
+```
+
+### Recurrence
+
+```console
+$ kl recur 1 weekly         # daily | weekly | monthly | none
+```
+
+When a recurring task is marked `done`, komlist spawns a fresh `todo` copy
+with its due date advanced by one cadence (from the old due date, or from
+now if it had none).
+
+### Board view
+
+`kl board` is a colored, taskbook-style view grouping tasks by tag, each
+group ordered by urgency, with a completion footer. `kl list` stays the
+plain, scriptable table.
+
+```console
+$ kl board               # all tasks, grouped by tag
+$ kl board travail       # only the "travail" board
+$ kl board --status todo # only pending items
+```
+
+```
+ perso
+  4. ☐ acheter du pain ⚑ 2026-06-02 ⟳weekly
+  3. ✔ acheter du pain ⟳weekly
+
+ travail
+  1. ☐ clean bdd 30j ·high ⚑ 2026-06-30
+  2. ▶ migrate API
+
+ 1 done · 1 doing · 2 todo — 25% complete
+```
+
+Colors are disabled automatically when output is piped or `NO_COLOR` is set.
 
 ### Errors
 
@@ -150,6 +202,23 @@ Tasks are stored as JSON in `~/.komlist/tasks.json`. Writes are atomic
 exclusive interprocess lock (sidecar `tasks.json.lock`, via `flock(2)`)
 serialises concurrent `kl` invocations — running two shells against the
 same store is safe.
+
+### Git-backed history (optional)
+
+Turn `~/.komlist` into a git repository and komlist will commit every
+mutation automatically — a full, diffable history of your tasks:
+
+```bash
+git -C ~/.komlist init
+kl add "now versioned"
+git -C ~/.komlist log --oneline   # kl: create #1 now versioned
+```
+
+Detection is automatic (presence of `~/.komlist/.git`). Commits are
+best-effort: if git is missing or fails, the task operation still
+succeeds. This is a second `storage.Repository` implementation decorating
+the JSON one — the service and CLI are unchanged, illustrating the
+hexagonal design.
 
 ## Architecture
 

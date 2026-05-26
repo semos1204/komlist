@@ -24,6 +24,18 @@
   `kl list --sort priority` (high first).
 - ✅ **Adaptive list output** — optional columns appear only when at least
   one task uses them, so the default `kl list` stays compact.
+- ✅ **Notes / annotations** — `Task.Notes`, `kl note <id> <text>` (append)
+  and `--clear`, surfaced by `kl show <id>`.
+- ✅ **Urgency score** — Taskwarrior-inspired heuristic (priority + due
+  proximity + status + age) in `internal/service/urgency.go`, exposed via
+  `kl list --sort urgency` and used to order the board.
+- ✅ **Recurrence** — `task.Recurrence` (daily/weekly/monthly), `kl recur`,
+  completing a recurring task spawns the next occurrence with a shifted due.
+- ✅ **Git-backed history** — `storage.GitRepository` decorator commits every
+  mutation when `~/.komlist` is a git work tree (inspired by dstask). Pure
+  win of the `Repository` port: service/CLI untouched.
+- ✅ **Board view** — `kl board`, taskbook-style grouped/colored output via
+  `charmbracelet/lipgloss`, ordered by urgency, with a completion footer.
 
 ## Open
 
@@ -38,4 +50,8 @@
   alongside `JSONRepository` (SQLite via `modernc.org/sqlite` for a pure-Go
   build, or BoltDB for embedded). The service and CLI stay unchanged; pick
   the backend in `cmd/kl/main.go` via a flag or env var.
-- **Recurrence / snoozing** — derived from `DueAt`. Out of scope today.
+- **Task dependencies** — Taskwarrior-style `depends`, surfaced in urgency
+  (a blocked-by-incomplete task sinks) and the board.
+- **Interval recurrence** — accept `2w` / `3d` in addition to the keyword
+  cadences.
+- **Interactive TUI** — a Bubble Tea front-end over the board view.

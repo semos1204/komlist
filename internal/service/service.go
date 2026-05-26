@@ -35,6 +35,7 @@ const (
 	SortByDueAt
 	SortByPriority
 	SortByStatus
+	SortByUrgency
 )
 
 // ParseSortBy parses a user-supplied sort key. An empty string maps to
@@ -49,8 +50,10 @@ func ParseSortBy(s string) (SortBy, error) {
 		return SortByPriority, nil
 	case "status":
 		return SortByStatus, nil
+	case "urgency", "urg":
+		return SortByUrgency, nil
 	default:
-		return 0, fmt.Errorf("%w: %q (valid: id, due, priority, status)", ErrInvalidSort, s)
+		return 0, fmt.Errorf("%w: %q (valid: id, due, priority, status, urgency)", ErrInvalidSort, s)
 	}
 }
 
@@ -95,18 +98,65 @@ func (s *TaskService) List(ctx context.Context, f ListFilter) ([]task.Task, erro
 		}
 		out = append(out, t)
 	}
-	sortTasks(out, f.Sort)
+	sortTasks(out, f.Sort, s.clock.Now())
 	return out, nil
+}
+
+// Get returns a single task by id, or storage.ErrNotFound.
+func (s *TaskService) Get(ctx context.Context, id int) (task.Task, error) {
+	return s.repo.Get(ctx, id)
 }
 
 // ChangeStatus updates the task's status and refreshes UpdatedAt. Returns
 // ErrInvalidStatus if st is not a known status, storage.ErrNotFound if no
 // task has the given id.
+//
+// When a recurring task transitions into "done" (from a non-done state), a
+// follow-up "todo" task is spawned with its due date advanced by one cadence.
 func (s *TaskService) ChangeStatus(ctx context.Context, id int, st task.Status) (task.Task, error) {
 	if !st.Valid() {
 		return task.Task{}, fmt.Errorf("%w: %q (valid: %v)", ErrInvalidStatus, st, task.AllStatuses())
 	}
-	return s.mutate(ctx, id, func(t *task.Task) { t.Status = st })
+	t, err := s.repo.Get(ctx, id)
+	if err != nil {
+		return task.Task{}, err
+	}
+	wasDone := t.Status == task.StatusDone
+	t.Status = st
+	t.UpdatedAt = s.clock.Now()
+	if err := s.repo.Update(ctx, t); err != nil {
+		return task.Task{}, err
+	}
+	if st == task.StatusDone && !wasDone && t.Recur != task.RecurNone {
+		if err := s.spawnRecurrence(ctx, t); err != nil {
+			return t, err
+		}
+	}
+	return t, nil
+}
+
+// spawnRecurrence creates the next occurrence of a recurring task. The new
+// task's due date is the cadence applied to the completed task's due date
+// (or to "now" if it had none).
+func (s *TaskService) spawnRecurrence(ctx context.Context, done task.Task) error {
+	now := s.clock.Now()
+	base := now
+	if done.DueAt != nil {
+		base = *done.DueAt
+	}
+	next := done.Recur.Next(base)
+	follow := task.Task{
+		Title:     done.Title,
+		Status:    task.StatusTodo,
+		Priority:  done.Priority,
+		Tags:      append([]string(nil), done.Tags...),
+		Recur:     done.Recur,
+		DueAt:     &next,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	_, err := s.repo.Create(ctx, follow)
+	return err
 }
 
 // Rename changes a task's title and refreshes UpdatedAt.
@@ -136,6 +186,29 @@ func (s *TaskService) SetPriority(ctx context.Context, id int, p task.Priority) 
 // SetDueAt sets or clears a task's due date. Pass nil to clear.
 func (s *TaskService) SetDueAt(ctx context.Context, id int, due *time.Time) (task.Task, error) {
 	return s.mutate(ctx, id, func(t *task.Task) { t.DueAt = due })
+}
+
+// SetRecurrence sets or clears a task's recurrence cadence.
+func (s *TaskService) SetRecurrence(ctx context.Context, id int, r task.Recurrence) (task.Task, error) {
+	if !r.Valid() {
+		return task.Task{}, fmt.Errorf("%w: %q (valid: none, %v)", ErrInvalidRecurrence, r, task.AllRecurrences())
+	}
+	return s.mutate(ctx, id, func(t *task.Task) { t.Recur = r })
+}
+
+// AddNote appends a note to a task. The body is trimmed; a blank note
+// returns ErrEmptyNote.
+func (s *TaskService) AddNote(ctx context.Context, id int, text string) (task.Task, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return task.Task{}, ErrEmptyNote
+	}
+	return s.mutate(ctx, id, func(t *task.Task) { t.Notes = append(t.Notes, text) })
+}
+
+// ClearNotes removes all notes from a task.
+func (s *TaskService) ClearNotes(ctx context.Context, id int) (task.Task, error) {
+	return s.mutate(ctx, id, func(t *task.Task) { t.Notes = nil })
 }
 
 // Delete removes the task with the given id.
@@ -288,7 +361,7 @@ func hasTag(tags []string, target string) bool {
 	return false
 }
 
-func sortTasks(tasks []task.Task, by SortBy) {
+func sortTasks(tasks []task.Task, by SortBy, now time.Time) {
 	switch by {
 	case SortByDueAt:
 		sort.SliceStable(tasks, func(i, j int) bool {
@@ -301,6 +374,10 @@ func sortTasks(tasks []task.Task, by SortBy) {
 	case SortByStatus:
 		sort.SliceStable(tasks, func(i, j int) bool {
 			return statusRank(tasks[i].Status) < statusRank(tasks[j].Status)
+		})
+	case SortByUrgency:
+		sort.SliceStable(tasks, func(i, j int) bool {
+			return urgency(tasks[i], now) > urgency(tasks[j], now)
 		})
 	default:
 		sort.SliceStable(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })

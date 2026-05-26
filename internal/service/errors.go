@@ -19,4 +19,10 @@ var (
 
 	// ErrEmptyTag is returned when a tag rename target is blank.
 	ErrEmptyTag = errors.New("tag must not be empty")
+
+	// ErrEmptyNote is returned when a note body is blank.
+	ErrEmptyNote = errors.New("note must not be empty")
+
+	// ErrInvalidRecurrence is returned when an unknown recurrence is requested.
+	ErrInvalidRecurrence = errors.New("invalid recurrence")
 )

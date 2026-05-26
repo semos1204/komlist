@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/semos1204/komlist/internal/cli"
 	"github.com/semos1204/komlist/internal/clock"
@@ -33,11 +34,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	repo, err := storage.NewJSON(path)
+	jsonRepo, err := storage.NewJSON(path)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = repo.Close() }()
+	defer func() { _ = jsonRepo.Close() }()
+
+	// When ~/.komlist is a git work tree, version every mutation.
+	var repo storage.Repository = jsonRepo
+	if dir := filepath.Dir(path); storage.IsGitDir(dir) {
+		repo = storage.NewGit(jsonRepo, dir)
+	}
 
 	svc := service.New(repo, clock.System{})
 	root := cli.NewRootCommand(svc)

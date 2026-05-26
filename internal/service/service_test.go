@@ -432,6 +432,126 @@ func TestRenameTag_EmptyTarget(t *testing.T) {
 	}
 }
 
+func TestAddNote(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	created, _ := svc.Add(ctx, "x")
+
+	got, err := svc.AddNote(ctx, created.ID, "  first note  ")
+	if err != nil {
+		t.Fatalf("addNote: %v", err)
+	}
+	if len(got.Notes) != 1 || got.Notes[0] != "first note" {
+		t.Errorf("notes = %v", got.Notes)
+	}
+	got, _ = svc.AddNote(ctx, created.ID, "second")
+	if len(got.Notes) != 2 {
+		t.Errorf("expected 2 notes, got %v", got.Notes)
+	}
+	cleared, _ := svc.ClearNotes(ctx, created.ID)
+	if cleared.Notes != nil {
+		t.Errorf("expected nil notes after clear, got %v", cleared.Notes)
+	}
+}
+
+func TestAddNote_Empty(t *testing.T) {
+	svc, _ := newSvc()
+	created, _ := svc.Add(context.Background(), "x")
+	if _, err := svc.AddNote(context.Background(), created.ID, "   "); !errors.Is(err, service.ErrEmptyNote) {
+		t.Errorf("got %v, want ErrEmptyNote", err)
+	}
+}
+
+func TestSetRecurrence(t *testing.T) {
+	svc, _ := newSvc()
+	created, _ := svc.Add(context.Background(), "x")
+	got, err := svc.SetRecurrence(context.Background(), created.ID, task.RecurWeekly)
+	if err != nil {
+		t.Fatalf("setRecurrence: %v", err)
+	}
+	if got.Recur != task.RecurWeekly {
+		t.Errorf("recur = %q, want weekly", got.Recur)
+	}
+}
+
+func TestSetRecurrence_Invalid(t *testing.T) {
+	svc, _ := newSvc()
+	created, _ := svc.Add(context.Background(), "x")
+	if _, err := svc.SetRecurrence(context.Background(), created.ID, task.Recurrence("yearly")); !errors.Is(err, service.ErrInvalidRecurrence) {
+		t.Errorf("got %v, want ErrInvalidRecurrence", err)
+	}
+}
+
+func TestChangeStatus_SpawnsRecurrence(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	created, _ := svc.Add(ctx, "weekly chore")
+	due := time.Date(2026, 1, 5, 0, 0, 0, 0, time.UTC)
+	if _, err := svc.SetDueAt(ctx, created.ID, &due); err != nil {
+		t.Fatalf("setDue: %v", err)
+	}
+	if _, err := svc.SetRecurrence(ctx, created.ID, task.RecurWeekly); err != nil {
+		t.Fatalf("setRecur: %v", err)
+	}
+
+	if _, err := svc.ChangeStatus(ctx, created.ID, task.StatusDone); err != nil {
+		t.Fatalf("done: %v", err)
+	}
+
+	all, _ := svc.List(ctx, service.ListFilter{})
+	if len(all) != 2 {
+		t.Fatalf("expected original done + spawned todo (2), got %d", len(all))
+	}
+	var spawned *task.Task
+	for i := range all {
+		if all[i].Status == task.StatusTodo {
+			spawned = &all[i]
+		}
+	}
+	if spawned == nil {
+		t.Fatal("no spawned todo found")
+	}
+	wantDue := due.AddDate(0, 0, 7)
+	if spawned.DueAt == nil || !spawned.DueAt.Equal(wantDue) {
+		t.Errorf("spawned due = %v, want %v", spawned.DueAt, wantDue)
+	}
+	if spawned.Recur != task.RecurWeekly {
+		t.Errorf("spawned recur = %q, want weekly", spawned.Recur)
+	}
+}
+
+func TestChangeStatus_NoSpawnWhenNotRecurring(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	created, _ := svc.Add(ctx, "one-off")
+	if _, err := svc.ChangeStatus(ctx, created.ID, task.StatusDone); err != nil {
+		t.Fatalf("done: %v", err)
+	}
+	all, _ := svc.List(ctx, service.ListFilter{})
+	if len(all) != 1 {
+		t.Errorf("expected 1 task, got %d", len(all))
+	}
+}
+
+func TestChangeStatus_NoDoubleSpawn(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	created, _ := svc.Add(ctx, "chore")
+	if _, err := svc.SetRecurrence(ctx, created.ID, task.RecurDaily); err != nil {
+		t.Fatalf("setRecur: %v", err)
+	}
+	if _, err := svc.ChangeStatus(ctx, created.ID, task.StatusDone); err != nil {
+		t.Fatalf("first done: %v", err)
+	}
+	if _, err := svc.ChangeStatus(ctx, created.ID, task.StatusDone); err != nil {
+		t.Fatalf("second done: %v", err)
+	}
+	all, _ := svc.List(ctx, service.ListFilter{})
+	if len(all) != 2 {
+		t.Errorf("expected 2 tasks (no double spawn on done->done), got %d", len(all))
+	}
+}
+
 func TestDelete(t *testing.T) {
 	svc, _ := newSvc()
 	ctx := context.Background()
