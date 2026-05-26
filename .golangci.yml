@@ -13,6 +13,14 @@ linters:
     - gocyclo
     - misspell
   settings:
+    errcheck:
+      # CLI write paths: a failing stdout/stderr write is not actionable
+      # (the user has closed the pipe). Skip them rather than littering the
+      # code with `_ =`.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
     gocyclo:
       min-complexity: 15
   exclusions:
