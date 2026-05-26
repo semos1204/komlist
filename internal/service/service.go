@@ -143,6 +143,108 @@ func (s *TaskService) Delete(ctx context.Context, id int) error {
 	return s.repo.Delete(ctx, id)
 }
 
+// TagCount associates a tag with the number of tasks carrying it.
+type TagCount struct {
+	Tag   string
+	Count int
+}
+
+// Tags returns every distinct tag currently in use across all tasks, with
+// the number of tasks each tag is attached to, sorted alphabetically.
+func (s *TaskService) Tags(ctx context.Context) ([]TagCount, error) {
+	all, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int)
+	for _, t := range all {
+		for _, tag := range t.Tags {
+			counts[tag]++
+		}
+	}
+	out := make([]TagCount, 0, len(counts))
+	for tag, n := range counts {
+		out = append(out, TagCount{Tag: tag, Count: n})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Tag < out[j].Tag })
+	return out, nil
+}
+
+// DeleteTag removes the given tag from every task that carries it. Returns
+// the number of tasks affected. Removing a tag that no task carries is a
+// no-op and returns 0 without an error.
+func (s *TaskService) DeleteTag(ctx context.Context, tag string) (int, error) {
+	all, err := s.repo.List(ctx)
+	if err != nil {
+		return 0, err
+	}
+	affected := 0
+	for _, t := range all {
+		if !hasTag(t.Tags, tag) {
+			continue
+		}
+		t.Tags = withoutTag(t.Tags, tag)
+		t.UpdatedAt = s.clock.Now()
+		if err := s.repo.Update(ctx, t); err != nil {
+			return affected, err
+		}
+		affected++
+	}
+	return affected, nil
+}
+
+// RenameTag renames the tag `from` to `to` across every task. The new name
+// is trimmed; an empty target returns ErrEmptyTag. Tasks that already carry
+// `to` see the duplicate de-duplicated. Returns the number of tasks
+// affected; renaming to the same name is a no-op.
+func (s *TaskService) RenameTag(ctx context.Context, from, to string) (int, error) {
+	to = strings.TrimSpace(to)
+	if to == "" {
+		return 0, ErrEmptyTag
+	}
+	if from == to {
+		return 0, nil
+	}
+	all, err := s.repo.List(ctx)
+	if err != nil {
+		return 0, err
+	}
+	affected := 0
+	for _, t := range all {
+		if !hasTag(t.Tags, from) {
+			continue
+		}
+		renamed := make([]string, 0, len(t.Tags))
+		for _, tag := range t.Tags {
+			if tag == from {
+				renamed = append(renamed, to)
+			} else {
+				renamed = append(renamed, tag)
+			}
+		}
+		t.Tags = normalizeTags(renamed)
+		t.UpdatedAt = s.clock.Now()
+		if err := s.repo.Update(ctx, t); err != nil {
+			return affected, err
+		}
+		affected++
+	}
+	return affected, nil
+}
+
+func withoutTag(tags []string, drop string) []string {
+	out := make([]string, 0, len(tags))
+	for _, t := range tags {
+		if t != drop {
+			out = append(out, t)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // mutate loads a task, applies fn, refreshes UpdatedAt and persists.
 func (s *TaskService) mutate(ctx context.Context, id int, fn func(*task.Task)) (task.Task, error) {
 	t, err := s.repo.Get(ctx, id)

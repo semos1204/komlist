@@ -33,6 +33,7 @@ func NewRootCommand(svc *service.TaskService) *cobra.Command {
 		NewStatusCommand(svc),
 		NewEditCommand(svc),
 		NewTagCommand(svc),
+		NewTagsCommand(svc),
 		NewPriorityCommand(svc),
 		NewDueCommand(svc),
 		NewDeleteCommand(svc),

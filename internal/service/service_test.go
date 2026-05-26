@@ -298,6 +298,140 @@ func TestParseSortBy(t *testing.T) {
 	}
 }
 
+func TestTags(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	a, _ := svc.Add(ctx, "a")
+	b, _ := svc.Add(ctx, "b")
+	c, _ := svc.Add(ctx, "c")
+	_, _ = svc.SetTags(ctx, a.ID, []string{"work", "urgent"})
+	_, _ = svc.SetTags(ctx, b.ID, []string{"work"})
+	_, _ = svc.SetTags(ctx, c.ID, []string{"personal"})
+
+	got, err := svc.Tags(ctx)
+	if err != nil {
+		t.Fatalf("tags: %v", err)
+	}
+	want := []service.TagCount{
+		{Tag: "personal", Count: 1},
+		{Tag: "urgent", Count: 1},
+		{Tag: "work", Count: 2},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d tags, want %d (%+v vs %+v)", len(got), len(want), got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("[%d] got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestTags_Empty(t *testing.T) {
+	svc, _ := newSvc()
+	got, err := svc.Tags(context.Background())
+	if err != nil {
+		t.Fatalf("tags: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty, got %+v", got)
+	}
+}
+
+func TestDeleteTag(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	a, _ := svc.Add(ctx, "a")
+	b, _ := svc.Add(ctx, "b")
+	c, _ := svc.Add(ctx, "c")
+	_, _ = svc.SetTags(ctx, a.ID, []string{"work", "urgent"})
+	_, _ = svc.SetTags(ctx, b.ID, []string{"work"})
+	_, _ = svc.SetTags(ctx, c.ID, []string{"personal"})
+
+	n, err := svc.DeleteTag(ctx, "work")
+	if err != nil {
+		t.Fatalf("deleteTag: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("affected = %d, want 2", n)
+	}
+	got, _ := svc.Tags(ctx)
+	for _, tc := range got {
+		if tc.Tag == "work" {
+			t.Errorf("'work' should be gone, got %+v", got)
+		}
+	}
+
+	// idempotent: deleting again touches nothing
+	n, err = svc.DeleteTag(ctx, "work")
+	if err != nil {
+		t.Fatalf("deleteTag again: %v", err)
+	}
+	if n != 0 {
+		t.Errorf("second affected = %d, want 0", n)
+	}
+
+	// task with only "work" now has nil tags
+	got1, _ := svc.List(ctx, service.ListFilter{})
+	for _, tk := range got1 {
+		if tk.ID == b.ID && len(tk.Tags) != 0 {
+			t.Errorf("task #%d should have no tags, got %v", b.ID, tk.Tags)
+		}
+	}
+}
+
+func TestRenameTag(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	a, _ := svc.Add(ctx, "a")
+	b, _ := svc.Add(ctx, "b")
+	_, _ = svc.SetTags(ctx, a.ID, []string{"travail", "urgent"})
+	_, _ = svc.SetTags(ctx, b.ID, []string{"travail"})
+
+	n, err := svc.RenameTag(ctx, "travail", "work")
+	if err != nil {
+		t.Fatalf("renameTag: %v", err)
+	}
+	if n != 2 {
+		t.Errorf("affected = %d, want 2", n)
+	}
+	got, _ := svc.Tags(ctx)
+	want := []service.TagCount{
+		{Tag: "urgent", Count: 1},
+		{Tag: "work", Count: 2},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("[%d] got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestRenameTag_MergesDuplicates(t *testing.T) {
+	svc, _ := newSvc()
+	ctx := context.Background()
+	a, _ := svc.Add(ctx, "a")
+	_, _ = svc.SetTags(ctx, a.ID, []string{"work", "urgent"})
+
+	if _, err := svc.RenameTag(ctx, "urgent", "work"); err != nil {
+		t.Fatalf("rename: %v", err)
+	}
+	got, _ := svc.List(ctx, service.ListFilter{})
+	if len(got[0].Tags) != 1 || got[0].Tags[0] != "work" {
+		t.Errorf("expected [work], got %v", got[0].Tags)
+	}
+}
+
+func TestRenameTag_EmptyTarget(t *testing.T) {
+	svc, _ := newSvc()
+	if _, err := svc.RenameTag(context.Background(), "foo", "   "); !errors.Is(err, service.ErrEmptyTag) {
+		t.Errorf("got %v, want ErrEmptyTag", err)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	svc, _ := newSvc()
 	ctx := context.Background()

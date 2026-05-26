@@ -16,4 +16,7 @@ var (
 
 	// ErrInvalidSort is returned when an unknown sort key is requested.
 	ErrInvalidSort = errors.New("invalid sort")
+
+	// ErrEmptyTag is returned when a tag rename target is blank.
+	ErrEmptyTag = errors.New("tag must not be empty")
 )

@@ -298,6 +298,81 @@ func TestCLI_ListInvalidSortErrors(t *testing.T) {
 	}
 }
 
+func TestCLI_Tags(t *testing.T) {
+	_, _, run := newCLI(t)
+	if _, _, err := run("add", "x"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if _, _, err := run("tag", "1", "work,urgent"); err != nil {
+		t.Fatalf("tag: %v", err)
+	}
+	stdout, _, err := run("tags")
+	if err != nil {
+		t.Fatalf("tags: %v", err)
+	}
+	for _, want := range []string{"TAG", "COUNT", "work", "urgent"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("expected %q in tags output, got %q", want, stdout)
+		}
+	}
+}
+
+func TestCLI_TagsEmpty(t *testing.T) {
+	_, _, run := newCLI(t)
+	stdout, _, err := run("tags")
+	if err != nil {
+		t.Fatalf("tags: %v", err)
+	}
+	if !strings.Contains(stdout, "No tags.") {
+		t.Errorf("expected 'No tags.', got %q", stdout)
+	}
+}
+
+func TestCLI_TagsDelete(t *testing.T) {
+	_, _, run := newCLI(t)
+	if _, _, err := run("add", "x"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if _, _, err := run("tag", "1", "work,urgent"); err != nil {
+		t.Fatalf("tag: %v", err)
+	}
+	stdout, _, err := run("tags", "delete", "work")
+	if err != nil {
+		t.Fatalf("tags delete: %v", err)
+	}
+	if !strings.Contains(stdout, "1 task") {
+		t.Errorf("stdout = %q", stdout)
+	}
+	stdout, _, _ = run("tags")
+	if strings.Contains(stdout, "work") {
+		t.Errorf("work should be gone: %q", stdout)
+	}
+	if !strings.Contains(stdout, "urgent") {
+		t.Errorf("urgent should remain: %q", stdout)
+	}
+}
+
+func TestCLI_TagsRename(t *testing.T) {
+	_, _, run := newCLI(t)
+	if _, _, err := run("add", "x"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if _, _, err := run("tag", "1", "travail"); err != nil {
+		t.Fatalf("tag: %v", err)
+	}
+	stdout, _, err := run("tags", "rename", "travail", "work")
+	if err != nil {
+		t.Fatalf("tags rename: %v", err)
+	}
+	if !strings.Contains(stdout, "1 task") {
+		t.Errorf("stdout = %q", stdout)
+	}
+	stdout, _, _ = run("tags")
+	if strings.Contains(stdout, "travail") || !strings.Contains(stdout, "work") {
+		t.Errorf("rename didn't take effect: %q", stdout)
+	}
+}
+
 func TestCLI_ListWideShowsAllColumns(t *testing.T) {
 	_, _, run := newCLI(t)
 	if _, _, err := run("add", "x"); err != nil {
