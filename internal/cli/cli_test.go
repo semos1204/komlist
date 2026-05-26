@@ -297,3 +297,19 @@ func TestCLI_ListInvalidSortErrors(t *testing.T) {
 		t.Fatal("expected error on invalid sort")
 	}
 }
+
+func TestCLI_ListWideShowsAllColumns(t *testing.T) {
+	_, _, run := newCLI(t)
+	if _, _, err := run("add", "x"); err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	stdout, _, err := run("list", "--wide")
+	if err != nil {
+		t.Fatalf("list --wide: %v", err)
+	}
+	for _, want := range []string{"PRIO", "TAGS", "DUE"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("expected %q column in --wide output, got %q", want, stdout)
+		}
+	}
+}

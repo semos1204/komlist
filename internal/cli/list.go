@@ -13,11 +13,13 @@ import (
 	"github.com/semos1204/komlist/internal/task"
 )
 
-// NewListCommand returns "kl list [--status x] [--tag x] [--sort x]".
-// Optional columns (priority, tags, due) only appear when at least one
-// task in the result set uses them, keeping default output compact.
+// NewListCommand returns "kl list [--status x] [--tag x] [--sort x] [--wide]".
+// Optional columns (priority, tags, due) only appear when at least one task
+// in the result set uses them, keeping default output compact. Pass --wide
+// to force every column, even if no task has the value.
 func NewListCommand(svc *service.TaskService) *cobra.Command {
 	var statusFlag, tagFlag, sortFlag string
+	var wideFlag bool
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List tasks, optionally filtered or sorted",
@@ -45,7 +47,7 @@ func NewListCommand(svc *service.TaskService) *cobra.Command {
 				fmt.Fprintln(cmd.OutOrStdout(), "No tasks.")
 				return nil
 			}
-			renderTable(cmd.OutOrStdout(), tasks)
+			renderTable(cmd.OutOrStdout(), tasks, wideFlag)
 			return nil
 		},
 	}
@@ -55,13 +57,15 @@ func NewListCommand(svc *service.TaskService) *cobra.Command {
 		"filter by tag (exact match)")
 	cmd.Flags().StringVar(&sortFlag, "sort", "",
 		"sort by: id (default), due, priority, status")
+	cmd.Flags().BoolVarP(&wideFlag, "wide", "w", false,
+		"always show every column (PRIO, TAGS, DUE), even when empty")
 	return cmd
 }
 
-func renderTable(w io.Writer, tasks []task.Task) {
-	showPrio := anyHas(tasks, func(t task.Task) bool { return t.Priority != "" })
-	showTags := anyHas(tasks, func(t task.Task) bool { return len(t.Tags) > 0 })
-	showDue := anyHas(tasks, func(t task.Task) bool { return t.DueAt != nil })
+func renderTable(w io.Writer, tasks []task.Task, wide bool) {
+	showPrio := wide || anyHas(tasks, func(t task.Task) bool { return t.Priority != "" })
+	showTags := wide || anyHas(tasks, func(t task.Task) bool { return len(t.Tags) > 0 })
+	showDue := wide || anyHas(tasks, func(t task.Task) bool { return t.DueAt != nil })
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
