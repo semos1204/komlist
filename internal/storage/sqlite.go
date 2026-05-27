@@ -70,7 +70,7 @@ func (r *SQLiteRepository) List(ctx context.Context) ([]task.Task, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []task.Task
 	for rows.Next() {
 		t, err := scanTask(rows)

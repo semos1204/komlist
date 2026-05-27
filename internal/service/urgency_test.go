@@ -20,7 +20,7 @@ func TestUrgency_Ordering(t *testing.T) {
 		due := now.AddDate(0, 0, -1)
 		t.DueAt = &due
 	})
-	plainTodo := mk(func(t *task.Task) {})
+	plainTodo := mk(func(_ *task.Task) {})
 	doneTask := mk(func(t *task.Task) { t.Status = task.StatusDone; t.Priority = task.PriorityHigh })
 	blockedTask := mk(func(t *task.Task) { t.Status = task.StatusBlocked })
 

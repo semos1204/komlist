@@ -13,7 +13,7 @@ import (
 // NewNoteCommand returns "kl note <id> [text]". It appends a note to a task,
 // or clears every note when --clear is passed.
 func NewNoteCommand(svc *service.TaskService) *cobra.Command {
-	var clear bool
+	var clearFlag bool
 	cmd := &cobra.Command{
 		Use:   "note <id> [text]",
 		Short: "Append a note to a task (or clear all with --clear)",
@@ -23,7 +23,7 @@ func NewNoteCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("invalid id %q: %w", args[0], err)
 			}
-			if clear {
+			if clearFlag {
 				t, err := svc.ClearNotes(cmd.Context(), id)
 				if err != nil {
 					return err
@@ -42,6 +42,6 @@ func NewNoteCommand(svc *service.TaskService) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&clear, "clear", false, "remove all notes from the task")
+	cmd.Flags().BoolVar(&clearFlag, "clear", false, "remove all notes from the task")
 	return cmd
 }

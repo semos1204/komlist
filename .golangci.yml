@@ -29,6 +29,11 @@ linters:
         linters:
           - gocyclo
           - errcheck
+      # The i18n catalog holds French strings; the English-only misspell
+      # linter false-positives on words like "Récurrence".
+      - path: internal/i18n/
+        linters:
+          - misspell
 
 formatters:
   enable:
