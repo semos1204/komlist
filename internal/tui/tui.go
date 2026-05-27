@@ -21,7 +21,16 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
 	helpStyle  = lipgloss.NewStyle().Faint(true)
+
+	// selectedRowStyle highlights the row under the cursor with a full-width
+	// background so it stands out as you move with the arrow keys.
+	selectedRowStyle = lipgloss.NewStyle().
+				Bold(true).
+				Background(lipgloss.AdaptiveColor{Light: "252", Dark: "238"}).
+				Foreground(lipgloss.AdaptiveColor{Light: "16", Dark: "231"})
 )
+
+const defaultRowWidth = 60
 
 type model struct {
 	svc      *service.TaskService
@@ -29,6 +38,7 @@ type model struct {
 	tasks    []task.Task
 	blocked  map[int]bool
 	cursor   int
+	width    int
 	err      error
 	quitting bool
 }
@@ -60,28 +70,30 @@ func (m *model) reload() {
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	keyMsg, ok := msg.(tea.KeyMsg)
-	if !ok {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
 		return m, nil
-	}
-	switch keyMsg.String() {
-	case "q", "ctrl+c", "esc":
-		m.quitting = true
-		return m, tea.Quit
-	case "j", "down":
-		if m.cursor < len(m.tasks)-1 {
-			m.cursor++
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		case "j", "down":
+			if m.cursor < len(m.tasks)-1 {
+				m.cursor++
+			}
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case " ", "enter":
+			m.setStatus(nextStatus(m.currentStatus()))
+		case "d":
+			m.setStatus(task.StatusDone)
+		case "r":
+			m.reload()
 		}
-	case "k", "up":
-		if m.cursor > 0 {
-			m.cursor--
-		}
-	case " ", "enter":
-		m.setStatus(nextStatus(m.currentStatus()))
-	case "d":
-		m.setStatus(task.StatusDone)
-	case "r":
-		m.reload()
 	}
 	return m, nil
 }
@@ -99,14 +111,24 @@ func (m model) View() string {
 		b.WriteString("  (no tasks)\n")
 	}
 	for i, t := range m.tasks {
-		prefix := "  "
 		if i == m.cursor {
-			prefix = render.SelectedStyle.Render("> ")
+			plain := "› " + render.TaskLinePlain(t, m.blocked[t.ID])
+			b.WriteString(selectedRowStyle.Width(m.rowWidth()).Render(plain) + "\n")
+			continue
 		}
-		b.WriteString(prefix + render.TaskLine(t, m.blocked[t.ID]) + "\n")
+		b.WriteString("  " + render.TaskLine(t, m.blocked[t.ID]) + "\n")
 	}
-	b.WriteString("\n" + helpStyle.Render(" j/k move · space cycle · d done · r reload · q quit") + "\n")
+	b.WriteString("\n" + helpStyle.Render(" ↑/↓ or j/k move · space cycle · d done · r reload · q quit") + "\n")
 	return b.String()
+}
+
+// rowWidth returns the width used for the selection background bar, falling
+// back to a sensible default before the first WindowSizeMsg arrives.
+func (m model) rowWidth() int {
+	if m.width > 0 {
+		return m.width
+	}
+	return defaultRowWidth
 }
 
 func (m *model) currentStatus() task.Status {

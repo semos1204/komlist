@@ -16,11 +16,10 @@ import (
 
 // Shared styles.
 var (
-	GroupStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-	IDStyle       = lipgloss.NewStyle().Faint(true)
-	DoneStyle     = lipgloss.NewStyle().Faint(true).Strikethrough(true)
-	FooterStyle   = lipgloss.NewStyle().Faint(true)
-	SelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("13"))
+	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	IDStyle     = lipgloss.NewStyle().Faint(true)
+	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
+	FooterStyle = lipgloss.NewStyle().Faint(true)
 )
 
 var statusGlyph = map[task.Status]string{
@@ -107,6 +106,27 @@ func TaskLine(t task.Task, blocked bool) string {
 	}
 	if t.Recur != task.RecurNone {
 		parts = append(parts, Recur(t.Recur))
+	}
+	return strings.Join(parts, " ")
+}
+
+// TaskLinePlain renders the same content as TaskLine but without any embedded
+// styling, so callers can apply a single uniform style (e.g. a selection
+// background) over the whole line.
+func TaskLinePlain(t task.Task, blocked bool) string {
+	parts := []string{fmt.Sprintf("%d.", t.ID), statusGlyph[t.Status]}
+	if blocked {
+		parts = append(parts, "\U0001F512")
+	}
+	parts = append(parts, t.Title)
+	if t.Priority != "" {
+		parts = append(parts, "·"+string(t.Priority))
+	}
+	if t.DueAt != nil {
+		parts = append(parts, "⚑ "+t.DueAt.Format(time.DateOnly))
+	}
+	if t.Recur != task.RecurNone {
+		parts = append(parts, "⟳"+string(t.Recur))
 	}
 	return strings.Join(parts, " ")
 }
