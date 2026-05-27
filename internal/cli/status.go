@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/task"
 )
@@ -29,7 +30,7 @@ func NewStatusCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Updated: #%d [%s] %s\n", t.ID, t.Status, t.Title)
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyUpdated, t.ID, t.Status, t.Title))
 			return nil
 		},
 	}

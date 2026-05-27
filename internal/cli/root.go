@@ -31,6 +31,7 @@ func NewRootCommand(svc *service.TaskService) *cobra.Command {
 		NewAddCommand(svc),
 		NewListCommand(svc),
 		NewBoardCommand(svc),
+		NewUICommand(svc),
 		NewShowCommand(svc),
 		NewStatusCommand(svc),
 		NewEditCommand(svc),
@@ -40,6 +41,8 @@ func NewRootCommand(svc *service.TaskService) *cobra.Command {
 		NewDueCommand(svc),
 		NewRecurCommand(svc),
 		NewNoteCommand(svc),
+		NewBlockCommand(svc),
+		NewUnblockCommand(svc),
 		NewDeleteCommand(svc),
 	)
 	return root

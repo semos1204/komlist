@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 )
 
@@ -19,7 +20,7 @@ func NewAddCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created: #%d [%s] %s\n", t.ID, t.Status, t.Title)
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyCreated, t.ID, t.Status, t.Title))
 			return nil
 		},
 	}

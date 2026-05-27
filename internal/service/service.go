@@ -88,6 +88,7 @@ func (s *TaskService) List(ctx context.Context, f ListFilter) ([]task.Task, erro
 	if err != nil {
 		return nil, err
 	}
+	blocked := blockedSet(all)
 	out := make([]task.Task, 0, len(all))
 	for _, t := range all {
 		if f.Status != nil && t.Status != *f.Status {
@@ -98,7 +99,7 @@ func (s *TaskService) List(ctx context.Context, f ListFilter) ([]task.Task, erro
 		}
 		out = append(out, t)
 	}
-	sortTasks(out, f.Sort, s.clock.Now())
+	sortTasks(out, f.Sort, s.clock.Now(), blocked)
 	return out, nil
 }
 
@@ -361,7 +362,7 @@ func hasTag(tags []string, target string) bool {
 	return false
 }
 
-func sortTasks(tasks []task.Task, by SortBy, now time.Time) {
+func sortTasks(tasks []task.Task, by SortBy, now time.Time, blocked map[int]bool) {
 	switch by {
 	case SortByDueAt:
 		sort.SliceStable(tasks, func(i, j int) bool {
@@ -377,7 +378,7 @@ func sortTasks(tasks []task.Task, by SortBy, now time.Time) {
 		})
 	case SortByUrgency:
 		sort.SliceStable(tasks, func(i, j int) bool {
-			return urgency(tasks[i], now) > urgency(tasks[j], now)
+			return urgency(tasks[i], now, blocked[tasks[i].ID]) > urgency(tasks[j], now, blocked[tasks[j].ID])
 		})
 	default:
 		sort.SliceStable(tasks, func(i, j int) bool { return tasks[i].ID < tasks[j].ID })

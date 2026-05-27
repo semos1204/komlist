@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
+	"github.com/semos1204/komlist/internal/render"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/task"
 )
@@ -39,7 +41,11 @@ func NewBoardCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			renderBoard(cmd.OutOrStdout(), tasks)
+			blocked, err := svc.BlockedSet(cmd.Context())
+			if err != nil {
+				return err
+			}
+			renderBoard(cmd.OutOrStdout(), tasks, blocked)
 			return nil
 		},
 	}
@@ -48,39 +54,20 @@ func NewBoardCommand(svc *service.TaskService) *cobra.Command {
 	return cmd
 }
 
-func renderBoard(w io.Writer, tasks []task.Task) {
+func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool) {
 	if len(tasks) == 0 {
-		fmt.Fprintln(w, "No tasks.")
+		fmt.Fprintln(w, i18n.T(i18n.KeyNoTasks))
 		return
 	}
 	groups := groupByTag(tasks)
 	for _, name := range sortedGroupNames(groups) {
-		fmt.Fprintln(w, " "+groupStyle.Render(name))
+		fmt.Fprintln(w, " "+render.GroupStyle.Render(name))
 		for _, t := range groups[name] {
-			fmt.Fprintln(w, renderTaskLine(t))
+			fmt.Fprintln(w, "  "+render.TaskLine(t, blocked[t.ID]))
 		}
 		fmt.Fprintln(w)
 	}
 	fmt.Fprintln(w, renderStats(tasks))
-}
-
-func renderTaskLine(t task.Task) string {
-	parts := []string{"  " + renderID(t.ID), renderBullet(t.Status)}
-	title := t.Title
-	if t.Status == task.StatusDone {
-		title = doneStyle.Render(title)
-	}
-	parts = append(parts, title)
-	if t.Priority != "" {
-		parts = append(parts, renderPriority(t.Priority))
-	}
-	if t.DueAt != nil {
-		parts = append(parts, renderDue(*t.DueAt))
-	}
-	if t.Recur != task.RecurNone {
-		parts = append(parts, renderRecur(t.Recur))
-	}
-	return strings.Join(parts, " ")
 }
 
 // groupByTag buckets tasks by tag, preserving the incoming (urgency-sorted)
@@ -138,10 +125,10 @@ func renderStats(tasks []task.Task) string {
 	if total := len(tasks); total > 0 {
 		pct = done * 100 / total
 	}
-	parts := []string{fmt.Sprintf("%d done", done), fmt.Sprintf("%d doing", doing)}
+	parts := []string{i18n.T(i18n.KeyStatDone, done), i18n.T(i18n.KeyStatDoing, doing)}
 	if blocked > 0 {
-		parts = append(parts, fmt.Sprintf("%d blocked", blocked))
+		parts = append(parts, i18n.T(i18n.KeyStatBlocked, blocked))
 	}
-	parts = append(parts, fmt.Sprintf("%d todo", todo))
-	return footerStyle.Render(fmt.Sprintf(" %s — %d%% complete", strings.Join(parts, " · "), pct))
+	parts = append(parts, i18n.T(i18n.KeyStatTodo, todo))
+	return render.FooterStyle.Render(fmt.Sprintf(" %s — %s", strings.Join(parts, " · "), i18n.T(i18n.KeyStatComplete, pct)))
 }

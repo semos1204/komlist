@@ -130,11 +130,33 @@ $ kl note 1 --clear   # drop all notes
 
 ```console
 $ kl recur 1 weekly         # daily | weekly | monthly | none
+$ kl recur 1 2w             # or an interval: 3d, 2w, 1mo, …
 ```
 
 When a recurring task is marked `done`, komlist spawns a fresh `todo` copy
 with its due date advanced by one cadence (from the old due date, or from
 now if it had none).
+
+### Dependencies
+
+A task can depend on others; while any dependency is not `done` it is
+**blocked** — marked `🔒` on the board and sunk to the bottom of the urgency
+order. Cycles and self-dependencies are rejected.
+
+```console
+$ kl block 3 4       # task #3 now depends on #4
+$ kl unblock 3 4     # remove the dependency
+```
+
+### Interactive UI
+
+```console
+$ kl ui
+```
+
+A Bubble Tea terminal app over your tasks: `j`/`k` to move, `space` to cycle
+the status (todo → in-progress → done), `d` to mark done, `r` to reload,
+`q` to quit.
 
 ### Board view
 
@@ -219,6 +241,32 @@ best-effort: if git is missing or fails, the task operation still
 succeeds. This is a second `storage.Repository` implementation decorating
 the JSON one — the service and CLI are unchanged, illustrating the
 hexagonal design.
+
+### SQLite backend (optional)
+
+Set `KOMLIST_BACKEND=sqlite` to store tasks in `~/.komlist/tasks.db` instead
+of JSON, using a pure-Go SQLite driver (no cgo):
+
+```bash
+export KOMLIST_BACKEND=sqlite
+kl add "stored in sqlite"
+```
+
+This is a third `storage.Repository` implementation — again, no change to the
+service or CLI.
+
+## Language
+
+komlist's runtime output is localized. Set `KOMLIST_LANG=fr` for French
+(English is the default; locale forms like `fr_FR.UTF-8` are accepted):
+
+```console
+$ KOMLIST_LANG=fr kl add "acheter du pain"
+Créée : #1 [todo] acheter du pain
+```
+
+Cobra's structural help words (`Usage:`, `Flags:`, …) remain English; only
+komlist's own messages, table headers and errors are translated.
 
 ## Architecture
 

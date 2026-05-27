@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 )
 
@@ -24,11 +25,11 @@ func NewTagsCommand(svc *service.TaskService) *cobra.Command {
 				return err
 			}
 			if len(tags) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No tags.")
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyNoTags))
 				return nil
 			}
 			tw := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			fmt.Fprintln(tw, "TAG\tCOUNT")
+			fmt.Fprintf(tw, "%s\t%s\n", i18n.T(i18n.KeyColTag), i18n.T(i18n.KeyColCount))
 			for _, tc := range tags {
 				fmt.Fprintf(tw, "%s\t%d\n", tc.Tag, tc.Count)
 			}
@@ -53,7 +54,7 @@ func newTagsDeleteCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Removed tag %q from %d task(s).\n", args[0], n)
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyTagRemoved, args[0], n))
 			return nil
 		},
 	}
@@ -70,7 +71,7 @@ func newTagsRenameCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Renamed tag %q -> %q on %d task(s).\n", args[0], args[1], n)
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyTagRenamed, args[0], args[1], n))
 			return nil
 		},
 	}

@@ -14,9 +14,10 @@ import (
 //   - done tasks score 0 (they sink to the bottom)
 //   - priority: high +6, medium +3.9, low +1.8, unset 0
 //   - status: in-progress +4, blocked -5 (not actionable, sinks)
+//   - blocked by an incomplete dependency: -8 (sinks below plain todos)
 //   - due date: overdue +12, today +9, <=1d +8, <=3d +6, <=7d +4, <=14d +2, else +0.5
 //   - age: +0.02 per day since creation, capped at +2
-func urgency(t task.Task, now time.Time) float64 {
+func urgency(t task.Task, now time.Time, blocked bool) float64 {
 	if t.Status == task.StatusDone {
 		return 0
 	}
@@ -37,6 +38,10 @@ func urgency(t task.Task, now time.Time) float64 {
 		score += 4
 	case task.StatusBlocked:
 		score -= 5
+	}
+
+	if blocked {
+		score -= 8
 	}
 
 	if t.DueAt != nil {

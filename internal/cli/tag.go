@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 )
 
@@ -31,9 +32,9 @@ func NewTagCommand(svc *service.TaskService) *cobra.Command {
 				return err
 			}
 			if len(t.Tags) == 0 {
-				fmt.Fprintf(cmd.OutOrStdout(), "Tagged: #%d (none)\n", t.ID)
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyTaggedNone, t.ID))
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "Tagged: #%d [%s]\n", t.ID, strings.Join(t.Tags, ","))
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyTagged, t.ID, strings.Join(t.Tags, ",")))
 			}
 			return nil
 		},

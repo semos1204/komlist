@@ -25,4 +25,10 @@ var (
 
 	// ErrInvalidRecurrence is returned when an unknown recurrence is requested.
 	ErrInvalidRecurrence = errors.New("invalid recurrence")
+
+	// ErrSelfDependency is returned when a task is made to depend on itself.
+	ErrSelfDependency = errors.New("a task cannot depend on itself")
+
+	// ErrDependencyCycle is returned when a dependency would create a cycle.
+	ErrDependencyCycle = errors.New("dependency would create a cycle")
 )

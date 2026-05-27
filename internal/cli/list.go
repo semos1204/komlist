@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/task"
 )
@@ -44,7 +45,7 @@ func NewListCommand(svc *service.TaskService) *cobra.Command {
 				return err
 			}
 			if len(tasks) == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No tasks.")
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyNoTasks))
 				return nil
 			}
 			renderTable(cmd.OutOrStdout(), tasks, wideFlag)
@@ -69,17 +70,17 @@ func renderTable(w io.Writer, tasks []task.Task, wide bool) {
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 
-	headers := []string{"ID", "STATUS"}
+	headers := []string{i18n.T(i18n.KeyColID), i18n.T(i18n.KeyColStatus)}
 	if showPrio {
-		headers = append(headers, "PRIO")
+		headers = append(headers, i18n.T(i18n.KeyColPrio))
 	}
 	if showTags {
-		headers = append(headers, "TAGS")
+		headers = append(headers, i18n.T(i18n.KeyColTags))
 	}
 	if showDue {
-		headers = append(headers, "DUE")
+		headers = append(headers, i18n.T(i18n.KeyColDue))
 	}
-	headers = append(headers, "TITLE", "UPDATED")
+	headers = append(headers, i18n.T(i18n.KeyColTitle), i18n.T(i18n.KeyColUpdated))
 	fmt.Fprintln(tw, strings.Join(headers, "\t"))
 
 	for _, t := range tasks {

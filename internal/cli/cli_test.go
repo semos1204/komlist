@@ -9,9 +9,23 @@ import (
 
 	"github.com/semos1204/komlist/internal/cli"
 	"github.com/semos1204/komlist/internal/clock"
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/storage"
 )
+
+func TestCLI_FrenchOutput(t *testing.T) {
+	i18n.Configure("fr")
+	defer i18n.Configure("en")
+	_, _, run := newCLI(t)
+	stdout, _, err := run("add", "tâche")
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	if !strings.Contains(stdout, "Créée") {
+		t.Errorf("expected French output, got %q", stdout)
+	}
+}
 
 // newCLI returns a fresh service backed by an in-memory repository and a
 // fake clock, plus a run() helper that executes one CLI invocation on a

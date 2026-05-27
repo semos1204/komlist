@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 )
 
@@ -35,9 +36,9 @@ func NewDueCommand(svc *service.TaskService) *cobra.Command {
 				return err
 			}
 			if t.DueAt == nil {
-				fmt.Fprintf(cmd.OutOrStdout(), "Due: #%d (cleared)\n", t.ID)
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyDueCleared, t.ID))
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "Due: #%d %s\n", t.ID, t.DueAt.Format(time.DateOnly))
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyDue, t.ID, t.DueAt.Format(time.DateOnly)))
 			}
 			return nil
 		},

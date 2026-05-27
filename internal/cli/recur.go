@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/task"
 )
@@ -30,9 +31,9 @@ func NewRecurCommand(svc *service.TaskService) *cobra.Command {
 				return err
 			}
 			if t.Recur == task.RecurNone {
-				fmt.Fprintf(cmd.OutOrStdout(), "Recurrence cleared: #%d\n", t.ID)
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyRecurCleared, t.ID))
 			} else {
-				fmt.Fprintf(cmd.OutOrStdout(), "Recurrence: #%d %s\n", t.ID, t.Recur)
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyRecur, t.ID, t.Recur))
 			}
 			return nil
 		},

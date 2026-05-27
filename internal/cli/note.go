@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 )
 
@@ -27,17 +28,17 @@ func NewNoteCommand(svc *service.TaskService) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				fmt.Fprintf(cmd.OutOrStdout(), "Notes cleared: #%d\n", t.ID)
+				fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyNotesCleared, t.ID))
 				return nil
 			}
 			if len(args) < 2 {
-				return fmt.Errorf("missing note text (or pass --clear)")
+				return fmt.Errorf("%s", i18n.T(i18n.KeyMissingNote))
 			}
 			t, err := svc.AddNote(cmd.Context(), id, args[1])
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Note added: #%d (%d total)\n", t.ID, len(t.Notes))
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyNoteAdded, t.ID, len(t.Notes)))
 			return nil
 		},
 	}

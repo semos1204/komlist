@@ -24,14 +24,17 @@ func TestUrgency_Ordering(t *testing.T) {
 	doneTask := mk(func(t *task.Task) { t.Status = task.StatusDone; t.Priority = task.PriorityHigh })
 	blockedTask := mk(func(t *task.Task) { t.Status = task.StatusBlocked })
 
-	if urgency(overdueHigh, now) <= urgency(plainTodo, now) {
+	if urgency(overdueHigh, now, false) <= urgency(plainTodo, now, false) {
 		t.Error("overdue+high should outrank a plain todo")
 	}
-	if urgency(doneTask, now) != 0 {
-		t.Errorf("done task urgency = %v, want 0", urgency(doneTask, now))
+	if urgency(doneTask, now, false) != 0 {
+		t.Errorf("done task urgency = %v, want 0", urgency(doneTask, now, false))
 	}
-	if urgency(blockedTask, now) >= urgency(plainTodo, now) {
+	if urgency(blockedTask, now, false) >= urgency(plainTodo, now, false) {
 		t.Error("blocked task should sink below a plain todo")
+	}
+	if urgency(plainTodo, now, true) >= urgency(plainTodo, now, false) {
+		t.Error("dependency-blocked task should sink below the same task unblocked")
 	}
 }
 

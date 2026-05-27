@@ -36,22 +36,22 @@
   win of the `Repository` port: service/CLI untouched.
 - ✅ **Board view** — `kl board`, taskbook-style grouped/colored output via
   `charmbracelet/lipgloss`, ordered by urgency, with a completion footer.
-
-## Open
-
-- **i18n of CLI messages** — currently English-only by convention. If user
-  demand justifies it, wire `golang.org/x/text/message` behind a
-  `KOMLIST_LANG` env var (or a `--lang` global flag). Until then, error /
-  info strings live inline.
+- ✅ **Interval recurrence** — `kl recur 1 2w` (also `3d`, `1mo`) alongside the
+  keyword cadences.
+- ✅ **SQLite backend** — `KOMLIST_BACKEND=sqlite` stores in `~/.komlist/tasks.db`
+  via `modernc.org/sqlite` (pure Go). Third `Repository` implementation.
+- ✅ **Task dependencies** — `kl block`/`kl unblock`, cycle + self-dependency
+  rejection, blocked tasks sink in urgency and show `🔒` on the board.
+- ✅ **i18n (en/fr)** — runtime output, headers and errors localized via
+  `internal/i18n` + `KOMLIST_LANG`.
+- ✅ **Interactive TUI** — `kl ui`, a Bubble Tea front-end sharing the board's
+  rendering (`internal/render`).
 
 ## Possible next steps
 
-- **More storage backends** — drop a new `Repository` implementation
-  alongside `JSONRepository` (SQLite via `modernc.org/sqlite` for a pure-Go
-  build, or BoltDB for embedded). The service and CLI stay unchanged; pick
-  the backend in `cmd/kl/main.go` via a flag or env var.
-- **Task dependencies** — Taskwarrior-style `depends`, surfaced in urgency
-  (a blocked-by-incomplete task sinks) and the board.
-- **Interval recurrence** — accept `2w` / `3d` in addition to the keyword
-  cadences.
-- **Interactive TUI** — a Bubble Tea front-end over the board view.
+- **More languages** — the `internal/i18n` catalog is ready to accept more
+  than fr/en.
+- **Localized Cobra help** — override Cobra templates so `Usage:`/`Flags:`
+  and command descriptions also translate.
+- **Richer TUI** — grouping by tag, in-app editing/adding, tag/status filters.
+- **Cron-like recurrence** — "1st of each month" rules beyond fixed intervals.

@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/service"
 	"github.com/semos1204/komlist/internal/task"
 )
@@ -29,7 +30,7 @@ func NewPriorityCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Priority: #%d [%s]\n", t.ID, t.Priority)
+			fmt.Fprintln(cmd.OutOrStdout(), i18n.T(i18n.KeyPriority, t.ID, t.Priority))
 			return nil
 		},
 	}
