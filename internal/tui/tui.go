@@ -623,9 +623,13 @@ func (m model) renderRow(t task.Task) string {
 	if right == "" {
 		return left
 	}
+	// At least 4 spaces between the title and the right-side pills so long
+	// titles don't bump into the tag chips. The width-based filler grows
+	// beyond that when the terminal has room.
+	const minFiller = 4
 	filler := m.rowWidth() - lipgloss.Width(left) - lipgloss.Width(right) - 1
-	if filler < 1 {
-		filler = 1
+	if filler < minFiller {
+		filler = minFiller
 	}
 	return left + strings.Repeat(" ", filler) + right
 }

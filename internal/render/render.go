@@ -43,8 +43,10 @@ var (
 	pillBg = lipgloss.AdaptiveColor{Light: "252", Dark: "238"}
 	pillFg = lipgloss.AdaptiveColor{Light: "240", Dark: "248"}
 
-	pillCapStyle  = lipgloss.NewStyle().Foreground(pillBg)
-	pillBodyStyle = lipgloss.NewStyle().Background(pillBg).Foreground(pillFg)
+	pillCapStyle = lipgloss.NewStyle().Foreground(pillBg)
+	// Padding 0,1 = one cell of bg-coloured space on each side of the tag
+	// text so the rounded caps don't sit flush against the letters.
+	pillBodyStyle = lipgloss.NewStyle().Background(pillBg).Foreground(pillFg).Padding(0, 1)
 )
 
 // Powerline rounded caps. They require a Nerd Font in the terminal to
