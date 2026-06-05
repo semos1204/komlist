@@ -129,9 +129,13 @@ $ kl note 1 --clear   # drop all notes
 ### Recurrence
 
 ```console
-$ kl recur 1 weekly         # daily | weekly | monthly | none
+$ kl recur 1 weekly         # daily | weekly | monthly | weekdays | weekends | none
 $ kl recur 1 2w             # or an interval: 3d, 2w, 1mo, …
 ```
+
+`weekdays` jumps to the next Monday–Friday, `weekends` to the next
+Saturday–Sunday — useful for "daily standup except weekends" or "review
+inbox on weekend mornings".
 
 When a recurring task is marked `done`, komlist spawns a fresh `todo` copy
 with its due date advanced by one cadence (from the old due date, or from
@@ -167,7 +171,7 @@ with a full-width background bar; navigate with arrow keys (or `j`/`k`).
 | `p` | cycle priority (unset → low → medium → high → unset) |
 | `t` | set tags — `tag1,tag2` (empty clears) |
 | `u` | set due date — `YYYY-MM-DD` (empty clears) |
-| `R` | cycle recurrence (none → daily → weekly → monthly → none) |
+| `R` | cycle recurrence (none → daily → weekly → monthly → weekdays → weekends → none) |
 | `x` | delete (with `y/n` confirmation) |
 | `g` | toggle grouping by first tag |
 | `s` | cycle the status filter |

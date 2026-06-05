@@ -52,6 +52,10 @@
 - ✅ **In-TUI field editing** — `p` cycles priority, `t` sets tags, `u` sets
   due date, `R` cycles recurrence. Service.SetPriority now accepts an empty
   value as "clear", and `kl prio <id> none` mirrors due/recur for symmetry.
+- ✅ **`weekdays` / `weekends` recurrence** — calendar-aware cadences
+  (inspired by Taskwarrior) that jump to the next Mon-Fri or Sat-Sun
+  instead of adding a fixed interval. Available from the CLI and in the
+  TUI `R` cycle.
 
 ## Possible next steps
 

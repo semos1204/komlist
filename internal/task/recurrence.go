@@ -13,17 +13,23 @@ import (
 type Recurrence string
 
 // Keyword recurrences. RecurNone means the task does not repeat.
+//
+// RecurWeekdays and RecurWeekends are calendar-aware: their Next jumps to
+// the next Monday-to-Friday (resp. Saturday-or-Sunday) date instead of
+// adding a fixed interval.
 const (
-	RecurNone    Recurrence = ""
-	RecurDaily   Recurrence = "daily"
-	RecurWeekly  Recurrence = "weekly"
-	RecurMonthly Recurrence = "monthly"
+	RecurNone     Recurrence = ""
+	RecurDaily    Recurrence = "daily"
+	RecurWeekly   Recurrence = "weekly"
+	RecurMonthly  Recurrence = "monthly"
+	RecurWeekdays Recurrence = "weekdays"
+	RecurWeekends Recurrence = "weekends"
 )
 
 // AllRecurrences returns the selectable keyword cadences (excluding None).
 // Interval forms like "2w" are also accepted by ParseRecurrence.
 func AllRecurrences() []Recurrence {
-	return []Recurrence{RecurDaily, RecurWeekly, RecurMonthly}
+	return []Recurrence{RecurDaily, RecurWeekly, RecurMonthly, RecurWeekdays, RecurWeekends}
 }
 
 var intervalRe = regexp.MustCompile(`^([1-9][0-9]*)(d|w|mo)$`)
@@ -55,7 +61,8 @@ func (r Recurrence) parse() (n int, unit string, ok bool) {
 
 // Valid reports whether r is RecurNone, a known keyword, or a valid interval.
 func (r Recurrence) Valid() bool {
-	if r == RecurNone {
+	switch r {
+	case RecurNone, RecurWeekdays, RecurWeekends:
 		return true
 	}
 	_, _, ok := r.parse()
@@ -69,14 +76,21 @@ func ParseRecurrence(s string) (Recurrence, error) {
 	}
 	r := Recurrence(s)
 	if !r.Valid() {
-		return "", fmt.Errorf("invalid recurrence %q (valid: none, daily, weekly, monthly, or an interval like 2w, 3d, 1mo)", s)
+		return "", fmt.Errorf("invalid recurrence %q (valid: none, %v, or an interval like 2w/3d/1mo)", s, AllRecurrences())
 	}
 	return r, nil
 }
 
 // Next returns the instant one cadence after from. RecurNone returns from
-// unchanged.
+// unchanged. RecurWeekdays/Weekends jump to the next matching weekday rather
+// than adding a fixed interval.
 func (r Recurrence) Next(from time.Time) time.Time {
+	switch r {
+	case RecurWeekdays:
+		return nextMatchingDay(from, isWeekday)
+	case RecurWeekends:
+		return nextMatchingDay(from, isWeekend)
+	}
 	n, unit, ok := r.parse()
 	if !ok {
 		return from
@@ -92,3 +106,17 @@ func (r Recurrence) Next(from time.Time) time.Time {
 		return from
 	}
 }
+
+// nextMatchingDay walks forward from `from` until it lands on a day the
+// predicate accepts. It never returns `from` itself, so consecutive calls
+// always advance.
+func nextMatchingDay(from time.Time, match func(time.Weekday) bool) time.Time {
+	d := from.AddDate(0, 0, 1)
+	for !match(d.Weekday()) {
+		d = d.AddDate(0, 0, 1)
+	}
+	return d
+}
+
+func isWeekday(d time.Weekday) bool { return d != time.Saturday && d != time.Sunday }
+func isWeekend(d time.Weekday) bool { return d == time.Saturday || d == time.Sunday }

@@ -304,18 +304,19 @@ func TestTUI_CyclePriority(t *testing.T) {
 func TestTUI_CycleRecurrence(t *testing.T) {
 	m := testModel(t)
 	id := m.tasks[m.cursor].ID
-	m = step(m, key("R"))
-	if got := taskByID(m.tasks, id).Recur; got != task.RecurDaily {
-		t.Errorf("after 1×R, recur = %q, want daily", got)
+	want := []task.Recurrence{
+		task.RecurDaily,
+		task.RecurWeekly,
+		task.RecurMonthly,
+		task.RecurWeekdays,
+		task.RecurWeekends,
+		task.RecurNone,
 	}
-	m = step(m, key("R"))
-	m = step(m, key("R"))
-	if got := taskByID(m.tasks, id).Recur; got != task.RecurMonthly {
-		t.Errorf("after 3×R, recur = %q, want monthly", got)
-	}
-	m = step(m, key("R"))
-	if got := taskByID(m.tasks, id).Recur; got != task.RecurNone {
-		t.Errorf("after 4×R, recur should clear, got %q", got)
+	for i, w := range want {
+		m = step(m, key("R"))
+		if got := taskByID(m.tasks, id).Recur; got != w {
+			t.Errorf("after %d×R, recur = %q, want %q", i+1, got, w)
+		}
 	}
 }
 

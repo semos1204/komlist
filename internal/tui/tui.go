@@ -396,6 +396,8 @@ var recurrenceCycle = []task.Recurrence{
 	task.RecurDaily,
 	task.RecurWeekly,
 	task.RecurMonthly,
+	task.RecurWeekdays,
+	task.RecurWeekends,
 }
 
 // nextInCycle returns the value immediately after cur in cycle, wrapping
