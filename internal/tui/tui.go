@@ -31,7 +31,14 @@ var (
 				Foreground(lipgloss.AdaptiveColor{Light: "16", Dark: "231"})
 )
 
-const defaultRowWidth = 60
+const (
+	// defaultRowWidth is the selection-bar width used before the first
+	// WindowSizeMsg arrives. Replaced once the real terminal width is known.
+	defaultRowWidth = 60
+	// inputRightMargin keeps the textinput field a few columns away from the
+	// right edge so the caret never touches the border.
+	inputRightMargin = 10
+)
 
 type mode int
 
@@ -57,9 +64,9 @@ type model struct {
 	statusFilter *task.Status
 	tagFilter    string
 
-	mode      mode
-	input     textinput.Model
-	pendingID int
+	mode     mode
+	input    textinput.Model
+	targetID int // task being edited or queued for deletion (0 when none)
 
 	err      error
 	quitting bool
@@ -106,7 +113,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
-		m.input.Width = max(20, msg.Width-10)
+		m.input.Width = max(20, msg.Width-inputRightMargin)
 		return m, nil
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -117,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case modeAdd, modeEdit, modeFilterTag:
 			return m.handleInputKey(msg)
 		case modeConfirmDelete:
-			return m.handleConfirmKey(msg), nil
+			return m.handleConfirmKey(msg)
 		default:
 			return m.handleNormalKey(msg)
 		}
@@ -196,20 +203,20 @@ func (m model) handleInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) handleConfirmKey(msg tea.KeyMsg) model {
+func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "y":
-		if err := m.svc.Delete(m.ctx, m.pendingID); err != nil {
+		if err := m.svc.Delete(m.ctx, m.targetID); err != nil {
 			m.err = err
 		}
-		m.pendingID = 0
+		m.targetID = 0
 		m.mode = modeNormal
 		m.reload()
 	case "n", "esc":
-		m.pendingID = 0
+		m.targetID = 0
 		m.mode = modeNormal
 	}
-	return m
+	return m, nil
 }
 
 func (m *model) enterAdd() {
@@ -227,7 +234,7 @@ func (m *model) enterEdit() {
 	m.input.SetValue(t.Title)
 	m.input.Placeholder = ""
 	m.input.Focus()
-	m.pendingID = t.ID
+	m.targetID = t.ID
 	m.mode = modeEdit
 }
 
@@ -243,7 +250,7 @@ func (m *model) enterConfirmDelete() {
 	if !ok {
 		return
 	}
-	m.pendingID = t.ID
+	m.targetID = t.ID
 	m.mode = modeConfirmDelete
 }
 
@@ -251,7 +258,7 @@ func (m *model) exitInput() {
 	m.input.Blur()
 	m.input.SetValue("")
 	m.input.Placeholder = ""
-	m.pendingID = 0
+	m.targetID = 0
 	m.mode = modeNormal
 }
 
@@ -269,8 +276,8 @@ func (m *model) commitInput() {
 			}
 		}
 	case modeEdit:
-		if val != "" && m.pendingID != 0 {
-			if _, err := m.svc.Rename(m.ctx, m.pendingID, val); err != nil {
+		if val != "" && m.targetID != 0 {
+			if _, err := m.svc.Rename(m.ctx, m.targetID, val); err != nil {
 				m.err = err
 			}
 			m.reload()
@@ -292,26 +299,34 @@ func (m *model) focusTask(id int) {
 	}
 }
 
+// statusCycle is the rotation order for the `s` keybind. The empty status
+// stands for "no filter" (show all).
+var statusCycle = []task.Status{
+	"",
+	task.StatusTodo,
+	task.StatusInProgress,
+	task.StatusBlocked,
+	task.StatusDone,
+}
+
 func (m *model) cycleStatusFilter() {
-	sequence := []string{"", string(task.StatusTodo), string(task.StatusInProgress), string(task.StatusBlocked), string(task.StatusDone)}
-	cur := ""
+	var cur task.Status
 	if m.statusFilter != nil {
-		cur = string(*m.statusFilter)
+		cur = *m.statusFilter
 	}
-	for i, s := range sequence {
+	next := statusCycle[0]
+	for i, s := range statusCycle {
 		if s == cur {
-			next := sequence[(i+1)%len(sequence)]
-			if next == "" {
-				m.statusFilter = nil
-			} else {
-				st := task.Status(next)
-				m.statusFilter = &st
-			}
-			m.cursor = 0
-			return
+			next = statusCycle[(i+1)%len(statusCycle)]
+			break
 		}
 	}
-	m.statusFilter = nil
+	if next == "" {
+		m.statusFilter = nil
+	} else {
+		m.statusFilter = &next
+	}
+	m.cursor = 0
 }
 
 func (m *model) currentTask() (task.Task, bool) {
@@ -340,6 +355,10 @@ func (m *model) setStatus(st task.Status) {
 	m.reload()
 }
 
+// nextStatus advances through the three active states (todo → in-progress →
+// done → todo) when the user hits space or enter. "blocked" is left out of
+// this rotation because it usually marks a state the user discovers rather
+// than chooses — it is reachable via the regular `kl status` command.
 func nextStatus(s task.Status) task.Status {
 	switch s {
 	case task.StatusTodo:
@@ -356,7 +375,7 @@ func (m model) View() string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(" komlist") + m.headerSuffix() + "\n\n")
+	b.WriteString(titleStyle.Render(" komlist") + "\n\n")
 	if m.err != nil {
 		b.WriteString("  error: " + m.err.Error() + "\n\n")
 	}
@@ -370,20 +389,6 @@ func (m model) View() string {
 	}
 	b.WriteString("\n" + m.bottomBar() + "\n")
 	return b.String()
-}
-
-func (m model) headerSuffix() string {
-	var parts []string
-	if m.statusFilter != nil {
-		parts = append(parts, "· "+string(*m.statusFilter))
-	}
-	if m.tagFilter != "" {
-		parts = append(parts, "· #"+m.tagFilter)
-	}
-	if len(parts) == 0 {
-		return ""
-	}
-	return helpStyle.Render(" " + strings.Join(parts, " "))
 }
 
 func (m model) renderTasks() string {
@@ -439,7 +444,7 @@ func (m model) bottomBar() string {
 	case modeFilterTag:
 		return helpStyle.Render(" tag filter: ") + m.input.View()
 	case modeConfirmDelete:
-		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.pendingID))
+		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.targetID))
 	default:
 		return helpStyle.Render(" ↑/↓ move · space cycle · d done · a add · e edit · x delete · g group · s status · f tag · c clear · r reload · q quit")
 	}

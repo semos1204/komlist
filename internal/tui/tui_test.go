@@ -110,7 +110,7 @@ func TestTUI_Add(t *testing.T) {
 		t.Fatalf("mode = %v, want modeAdd", m.mode)
 	}
 	m.input.SetValue("brand new task")
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.mode != modeNormal {
 		t.Fatalf("mode = %v, want modeNormal", m.mode)
 	}
@@ -135,7 +135,7 @@ func TestTUI_AddEmptyIgnored(t *testing.T) {
 	m := testModel(t)
 	initial := len(m.tasks)
 	m = step(m, key("a"))
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.mode != modeNormal {
 		t.Fatalf("mode = %v, want modeNormal", m.mode)
 	}
@@ -155,7 +155,7 @@ func TestTUI_Edit(t *testing.T) {
 		t.Errorf("input not prefilled, got %q", m.input.Value())
 	}
 	m.input.SetValue("renamed")
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.mode != modeNormal {
 		t.Fatal("should return to normal")
 	}
@@ -171,7 +171,7 @@ func TestTUI_EditCancelWithEsc(t *testing.T) {
 	original := m.tasks[m.cursor].Title
 	m = step(m, key("e"))
 	m.input.SetValue("should-be-ignored")
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEsc})
+	m = step(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.mode != modeNormal {
 		t.Fatal("esc should exit input")
 	}
@@ -247,7 +247,7 @@ func TestTUI_TagFilter(t *testing.T) {
 		t.Fatalf("mode = %v, want modeFilterTag", m.mode)
 	}
 	m.input.SetValue("travail")
-	m, _ = updateModel(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.tagFilter != "travail" {
 		t.Errorf("tagFilter = %q", m.tagFilter)
 	}
@@ -299,11 +299,4 @@ func TestTUI_GroupedToggle(t *testing.T) {
 	if m.grouped {
 		t.Error("g should toggle off")
 	}
-}
-
-// updateModel runs Update and returns the resulting model and cmd. Avoids the
-// 2-value type-assertion limitation when we need cmd too.
-func updateModel(m model, msg tea.Msg) (model, tea.Cmd) {
-	out, cmd := m.Update(msg)
-	return out.(model), cmd
 }
