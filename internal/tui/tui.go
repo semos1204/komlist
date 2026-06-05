@@ -27,11 +27,11 @@ var (
 	helpStyle      = lipgloss.NewStyle().Faint(true)
 	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
 
-	// selectedRowStyle gives the cursor row a subtle full-width background
-	// tint. The vertical accent bar marks the row; the tint completes the
-	// "here you are" signal without overpowering the row's content.
+	// selectedRowStyle tints the cursor row with a soft blue background
+	// keyed to the accent colour, so the cursor reads as "in family" with
+	// the vertical accent bar without overpowering the row's content.
 	selectedRowStyle = lipgloss.NewStyle().
-				Background(lipgloss.AdaptiveColor{Light: "254", Dark: "236"})
+				Background(lipgloss.AdaptiveColor{Light: "153", Dark: "25"})
 )
 
 const (
