@@ -69,7 +69,7 @@ var (
 	// use the body bg as their foreground so they "round off" the body's
 	// rectangle.
 	tagPalettes = []tagPalette{
-		// blue (default — most tags)
+		// blue
 		{
 			Bg: lipgloss.AdaptiveColor{Light: hexPillBgLight, Dark: hexPillBg},
 			Fg: lipgloss.AdaptiveColor{Light: hexAccentLight, Dark: hexAccent},
@@ -88,6 +88,26 @@ var (
 		{
 			Bg: lipgloss.AdaptiveColor{Light: "#f5ead4", Dark: "#2a261d"},
 			Fg: lipgloss.AdaptiveColor{Light: "#8c6b1c", Dark: "#e0af68"},
+		},
+		// green
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#e0f0d4", Dark: "#1f2a1e"},
+			Fg: lipgloss.AdaptiveColor{Light: "#4e7a2a", Dark: "#9ece6a"},
+		},
+		// pink (hot)
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#f9dde2", Dark: "#2a1d22"},
+			Fg: lipgloss.AdaptiveColor{Light: "#a82d4a", Dark: "#f7768e"},
+		},
+		// orange
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#fce8d4", Dark: "#2f221a"},
+			Fg: lipgloss.AdaptiveColor{Light: "#a35a1c", Dark: "#ff9e64"},
+		},
+		// magenta / rose
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#fadcf0", Dark: "#2d1d2c"},
+			Fg: lipgloss.AdaptiveColor{Light: "#9e3d80", Dark: "#ff79c6"},
 		},
 	}
 
