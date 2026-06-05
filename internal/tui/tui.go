@@ -23,25 +23,20 @@ import (
 )
 
 var (
-	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
-	helpStyle      = lipgloss.NewStyle().Faint(true)
-	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
+	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
+	helpStyle  = lipgloss.NewStyle().Faint(true)
 
-	// selectedRowStyle tints the cursor row with a soft blue background
-	// keyed to the accent colour, so the cursor reads as "in family" with
-	// the vertical accent bar without overpowering the row's content.
+	// selectedRowStyle tints the whole cursor row with a soft blue
+	// background keyed to the accent colour, so the row stands out at
+	// a glance.
 	selectedRowStyle = lipgloss.NewStyle().
 				Background(lipgloss.AdaptiveColor{Light: "153", Dark: "25"})
 )
 
 const (
-	// cursorBar is the accent vertical bar that marks the row under the
-	// cursor. One column wide so the row's content stays aligned with
-	// non-cursor rows indented by two spaces.
-	cursorBar = "▎"
 	// defaultRowWidth is the selection-bar width used before the first
 	// WindowSizeMsg arrives. Replaced once the real terminal width is known.
-	defaultRowWidth = 60
+	defaultRowWidth = 80
 	// inputRightMargin keeps the textinput field a few columns away from the
 	// right edge so the caret never touches the border.
 	inputRightMargin = 10
@@ -537,12 +532,10 @@ func (m model) renderTasks() string {
 			}
 		}
 		if i == m.cursor {
-			bar := cursorBarStyle.Render(cursorBar)
-			tint := selectedRowStyle.Width(m.rowWidth() - 1).
-				Render(" " + render.TaskLinePlain(t, m.blocked[t.ID]))
-			b.WriteString(bar + tint + "\n")
+			b.WriteString(selectedRowStyle.Width(m.rowWidth()).
+				Render(" "+render.TaskLinePlain(t, m.blocked[t.ID])) + "\n")
 		} else {
-			b.WriteString("  " + render.TaskLine(t, m.blocked[t.ID]) + "\n")
+			b.WriteString(m.renderRow(t) + "\n")
 		}
 	}
 	return b.String()
@@ -593,6 +586,23 @@ func (m model) rowWidth() int {
 		return m.width
 	}
 	return defaultRowWidth
+}
+
+// renderRow lays out a non-cursor row as "  <left> ... <right>" with the
+// right half (tag pills + recur + due) flushed to the terminal's right
+// edge. When the row has nothing right-aligned, it falls back to just the
+// left content.
+func (m model) renderRow(t task.Task) string {
+	left := "  " + render.TaskLineLeft(t, m.blocked[t.ID])
+	right := render.TaskLineRight(t)
+	if right == "" {
+		return left
+	}
+	filler := m.rowWidth() - lipgloss.Width(left) - lipgloss.Width(right) - 1
+	if filler < 1 {
+		filler = 1
+	}
+	return left + strings.Repeat(" ", filler) + right
 }
 
 func reorderByFirstTag(tasks []task.Task) []task.Task {

@@ -37,6 +37,14 @@ var (
 	IDStyle     = lipgloss.NewStyle().Faint(true)
 	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
 	FooterStyle = lipgloss.NewStyle().Faint(true)
+
+	// TagPillStyle renders a tag as a small soft-background pill. Padding
+	// of one cell on each side gives the visual chip look without needing
+	// a multi-line lipgloss border.
+	TagPillStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "252", Dark: "238"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "240", Dark: "248"}).
+			Padding(0, 1)
 )
 
 var statusGlyph = map[task.Status]string{
@@ -144,8 +152,9 @@ func sameDay(a, b time.Time) bool {
 // Recur renders a recurrence marker like "⟳ weekly".
 func Recur(r task.Recurrence) string { return FooterStyle.Render("⟳ " + string(r)) }
 
-// TaskLine renders a single task as "bullet id title h ⚐ Jan 02 ⟳ weekly".
-// Callers add their own leading indent or cursor marker.
+// TaskLine renders a task on a single line: "bullet id title prio due recur".
+// Used by the CLI board view; the TUI uses the left/right split below to
+// right-align tag pills.
 func TaskLine(t task.Task, blocked bool) string {
 	parts := []string{Bullet(t.Status), ID(t.ID)}
 	if blocked {
@@ -166,6 +175,56 @@ func TaskLine(t task.Task, blocked bool) string {
 		parts = append(parts, Recur(t.Recur))
 	}
 	return strings.Join(parts, " ")
+}
+
+// TaskLineLeft returns the left-aligned half of a TUI row: bullet, id,
+// optional lock, priority dot, and title. The right half (tags + due +
+// recur) is rendered separately by TaskLineRight so the TUI can flush it
+// against the right edge of the terminal.
+func TaskLineLeft(t task.Task, blocked bool) string {
+	parts := []string{Bullet(t.Status), ID(t.ID)}
+	if blocked {
+		parts = append(parts, "\U0001F512")
+	}
+	if prio := Priority(t.Priority); prio != "" {
+		parts = append(parts, prio)
+	}
+	title := t.Title
+	if t.Status == task.StatusDone {
+		title = DoneStyle.Render(title)
+	}
+	parts = append(parts, title)
+	return strings.Join(parts, " ")
+}
+
+// TaskLineRight returns the right-aligned half of a TUI row: tag pills,
+// recurrence marker, and due label, in that visual order. Returns the empty
+// string when none of those are set.
+func TaskLineRight(t task.Task) string {
+	var parts []string
+	if pills := TagPills(t.Tags); pills != "" {
+		parts = append(parts, pills)
+	}
+	if t.Recur != task.RecurNone {
+		parts = append(parts, Recur(t.Recur))
+	}
+	if t.DueAt != nil {
+		parts = append(parts, Due(*t.DueAt))
+	}
+	return strings.Join(parts, " ")
+}
+
+// TagPills renders a list of tags as soft-background chips, joined by a
+// single space.
+func TagPills(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	out := make([]string, len(tags))
+	for i, t := range tags {
+		out[i] = TagPillStyle.Render(t)
+	}
+	return strings.Join(out, " ")
 }
 
 // TaskLinePlain renders the same content as TaskLine but with no embedded
