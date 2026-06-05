@@ -38,13 +38,23 @@ var (
 	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
 	FooterStyle = lipgloss.NewStyle().Faint(true)
 
-	// TagPillStyle renders a tag as a small soft-background pill. Padding
-	// of one cell on each side gives the visual chip look without needing
-	// a multi-line lipgloss border.
-	TagPillStyle = lipgloss.NewStyle().
-			Background(lipgloss.AdaptiveColor{Light: "252", Dark: "238"}).
-			Foreground(lipgloss.AdaptiveColor{Light: "240", Dark: "248"}).
-			Padding(0, 1)
+	// Pill colour pair — soft adaptive grey, used by both the rounded caps
+	// (foreground = body bg) and the body itself.
+	pillBg = lipgloss.AdaptiveColor{Light: "252", Dark: "238"}
+	pillFg = lipgloss.AdaptiveColor{Light: "240", Dark: "248"}
+
+	pillCapStyle  = lipgloss.NewStyle().Foreground(pillBg)
+	pillBodyStyle = lipgloss.NewStyle().Background(pillBg).Foreground(pillFg)
+)
+
+// Powerline rounded caps. They require a Nerd Font in the terminal to
+// render as half-circles — without one they show up as missing-glyph
+// boxes. The visual idea: cap's foreground = body's background, the rest
+// of the cap takes whatever background is active around the pill, so the
+// cap "rounds off" the body's rectangle.
+const (
+	pillLeftCap  = ""
+	pillRightCap = ""
 )
 
 var statusGlyph = map[task.Status]string{
@@ -214,17 +224,51 @@ func TaskLineRight(t task.Task) string {
 	return strings.Join(parts, " ")
 }
 
-// TagPills renders a list of tags as soft-background chips, joined by a
-// single space.
+// TagPills renders a list of tags as rounded soft-background chips, joined
+// by two spaces so they read as separate units.
 func TagPills(tags []string) string {
 	if len(tags) == 0 {
 		return ""
 	}
 	out := make([]string, len(tags))
 	for i, t := range tags {
-		out[i] = TagPillStyle.Render(t)
+		out[i] = pillCapStyle.Render(pillLeftCap) +
+			pillBodyStyle.Render(t) +
+			pillCapStyle.Render(pillRightCap)
 	}
-	return strings.Join(out, " ")
+	return strings.Join(out, "  ")
+}
+
+// BgPrefix returns the raw ANSI sequence that sets bg to the given
+// adaptive colour for the current colour profile. Useful when callers
+// need to keep a row background continuous across nested resets — the
+// usual lipgloss wrap won't do that because the inner styles' resets
+// kill the outer background. Returns the empty string when bg is nil
+// or the profile has no colour.
+func BgPrefix(bg lipgloss.TerminalColor) string {
+	if bg == nil {
+		return ""
+	}
+	sentinel := "\x00"
+	rendered := lipgloss.NewStyle().Background(bg).Render(sentinel)
+	idx := strings.Index(rendered, sentinel)
+	if idx < 0 {
+		return ""
+	}
+	return rendered[:idx]
+}
+
+// WithRowBackground re-applies a row background after every ANSI reset
+// embedded in content, so a row stays visually uniform even when its
+// inner pieces have their own background or foreground styling. The
+// returned string starts with the bg sequence and ends with a final
+// reset so the background does not bleed into the next line.
+func WithRowBackground(content string, bgSeq string) string {
+	if bgSeq == "" {
+		return content
+	}
+	const reset = "\x1b[0m"
+	return bgSeq + strings.ReplaceAll(content, reset, reset+bgSeq) + reset
 }
 
 // TaskLinePlain renders the same content as TaskLine but with no embedded

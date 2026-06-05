@@ -25,12 +25,6 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
 	helpStyle  = lipgloss.NewStyle().Faint(true)
-
-	// selectedRowStyle tints the whole cursor row with a soft blue
-	// background keyed to the accent colour, so the row stands out at
-	// a glance.
-	selectedRowStyle = lipgloss.NewStyle().
-				Background(lipgloss.AdaptiveColor{Light: "153", Dark: "25"})
 )
 
 const (
@@ -518,6 +512,9 @@ func (m model) renderTasks() string {
 	var b strings.Builder
 	prev := ""
 	for i, t := range m.tasks {
+		if i > 0 {
+			b.WriteString("\n") // vertical breathing room between rows
+		}
 		if m.grouped {
 			bucket := render.UntaggedGroup
 			if len(t.Tags) > 0 {
@@ -531,15 +528,43 @@ func (m model) renderTasks() string {
 				prev = bucket
 			}
 		}
-		if i == m.cursor {
-			b.WriteString(selectedRowStyle.Width(m.rowWidth()).
-				Render(" "+render.TaskLinePlain(t, m.blocked[t.ID])) + "\n")
-		} else {
-			b.WriteString(m.renderRow(t) + "\n")
-		}
+		b.WriteString(m.renderTaskRow(i, t) + "\n")
 	}
 	return b.String()
 }
+
+// renderTaskRow lays out one task row. The non-cursor case is a straight
+// "left padding · right" layout. The cursor case shares the same layout
+// but is post-processed with WithRowBackground so the row background
+// survives each inner ANSI reset — the pills and per-element colours
+// stay visible on the blue band.
+func (m model) renderTaskRow(i int, t task.Task) string {
+	row := m.renderRow(t)
+	if i != m.cursor {
+		return row
+	}
+	// Pad to full width so the background covers the trailing whitespace.
+	if rem := m.rowWidth() - lipgloss.Width(row); rem > 0 {
+		row += strings.Repeat(" ", rem)
+	}
+	return render.WithRowBackground(row, selectedRowBgSeq())
+}
+
+// selectedRowBgSeq caches the ANSI sequence for the cursor row's
+// background colour. Computed lazily because lipgloss has to be
+// initialised; computed once because the colour profile doesn't change
+// after startup.
+func selectedRowBgSeq() string {
+	if cachedSelectedBgSeq == "" {
+		cachedSelectedBgSeq = render.BgPrefix(selectedRowBg)
+	}
+	return cachedSelectedBgSeq
+}
+
+var (
+	selectedRowBg       = lipgloss.AdaptiveColor{Light: "153", Dark: "25"}
+	cachedSelectedBgSeq string
+)
 
 func (m model) statusBar() string {
 	var parts []string
