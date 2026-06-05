@@ -14,6 +14,10 @@ import (
 	"github.com/semos1204/komlist/internal/task"
 )
 
+// UntaggedGroup is the heading used for tasks that carry no tag in
+// grouped views.
+const UntaggedGroup = "(untagged)"
+
 // Shared styles.
 var (
 	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))

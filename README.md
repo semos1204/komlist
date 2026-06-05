@@ -154,9 +154,25 @@ $ kl unblock 3 4     # remove the dependency
 $ kl ui
 ```
 
-A Bubble Tea terminal app over your tasks: `j`/`k` to move, `space` to cycle
-the status (todo → in-progress → done), `d` to mark done, `r` to reload,
-`q` to quit.
+A Bubble Tea terminal app over your tasks. The cursor row is highlighted
+with a full-width background bar; navigate with arrow keys (or `j`/`k`).
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` / `j` / `k` | move cursor |
+| `space` / `enter` | cycle status (todo → in-progress → done → todo) |
+| `d` | mark done |
+| `a` | add a task — opens an input bar |
+| `e` | rename the selected task |
+| `x` | delete (with `y/n` confirmation) |
+| `g` | toggle grouping by first tag |
+| `s` | cycle the status filter |
+| `f` | filter by tag (empty input clears) |
+| `c` | clear all filters |
+| `r` | reload from store |
+| `q` / `esc` / `ctrl+c` | quit |
+
+In an input field, `esc` cancels and `enter` commits.
 
 ### Board view
 

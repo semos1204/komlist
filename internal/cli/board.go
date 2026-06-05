@@ -14,8 +14,6 @@ import (
 	"github.com/semos1204/komlist/internal/task"
 )
 
-const untaggedGroup = "(untagged)"
-
 // NewBoardCommand returns "kl board [tag]", a colored, taskbook-style view
 // grouping tasks by tag and ordering each group by urgency. A positional
 // tag argument shows only that board; --status filters by status.
@@ -72,12 +70,12 @@ func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool) {
 
 // groupByTag buckets tasks by tag, preserving the incoming (urgency-sorted)
 // order within each bucket. Multi-tag tasks appear in each of their groups;
-// untagged tasks fall under untaggedGroup.
+// untagged tasks fall under render.UntaggedGroup.
 func groupByTag(tasks []task.Task) map[string][]task.Task {
 	groups := make(map[string][]task.Task)
 	for _, t := range tasks {
 		if len(t.Tags) == 0 {
-			groups[untaggedGroup] = append(groups[untaggedGroup], t)
+			groups[render.UntaggedGroup] = append(groups[render.UntaggedGroup], t)
 			continue
 		}
 		for _, tag := range t.Tags {
@@ -94,9 +92,9 @@ func sortedGroupNames(groups map[string][]task.Task) []string {
 	}
 	sort.Slice(names, func(i, j int) bool {
 		switch {
-		case names[i] == untaggedGroup:
+		case names[i] == render.UntaggedGroup:
 			return false
-		case names[j] == untaggedGroup:
+		case names[j] == render.UntaggedGroup:
 			return true
 		default:
 			return names[i] < names[j]

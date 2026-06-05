@@ -46,6 +46,9 @@
   `internal/i18n` + `KOMLIST_LANG`.
 - ✅ **Interactive TUI** — `kl ui`, a Bubble Tea front-end sharing the board's
   rendering (`internal/render`).
+- ✅ **Richer TUI** — `kl ui` now groups by first tag (`g`), adds (`a`) /
+  renames (`e`) / deletes (`x`) tasks in place via a bubbles textinput, and
+  filters by status (`s`) and tag (`f`); `c` clears filters.
 
 ## Possible next steps
 
@@ -53,5 +56,8 @@
   than fr/en.
 - **Localized Cobra help** — override Cobra templates so `Usage:`/`Flags:`
   and command descriptions also translate.
-- **Richer TUI** — grouping by tag, in-app editing/adding, tag/status filters.
+- **Localized TUI labels** — extend the i18n catalog to cover `add`/`edit`/
+  filter labels and key hints in `internal/tui`.
+- **Edit more fields from the TUI** — priority, due date, tags, recurrence,
+  dependencies.
 - **Cron-like recurrence** — "1st of each month" rules beyond fixed intervals.

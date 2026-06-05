@@ -510,6 +510,7 @@ func TestChangeStatus_SpawnsRecurrence(t *testing.T) {
 	}
 	if spawned == nil {
 		t.Fatal("no spawned todo found")
+		return
 	}
 	wantDue := due.AddDate(0, 0, 7)
 	if spawned.DueAt == nil || !spawned.DueAt.Equal(wantDue) {
