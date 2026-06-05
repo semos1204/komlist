@@ -27,23 +27,47 @@ import (
 // grouped views.
 const UntaggedGroup = "(untagged)"
 
-// Accent is the primary highlight colour, used for the TUI title and cursor
-// bar. Adaptive so it stays legible on light and dark terminals.
-var Accent = lipgloss.AdaptiveColor{Light: "27", Dark: "39"}
+// Tokyo Night Storm palette — the exact colours from the design spec the
+// user shared. Adaptive variants for light terminals approximate the same
+// hierarchy with darker text on light backgrounds.
+const (
+	hexAccent       = "#7aa2f7" // primary blue
+	hexAccentLight  = "#3b5fa8"
+	hexFg           = "#c0caf5"
+	hexFgLight      = "#1a1b26"
+	hexFgDim        = "#565f89"
+	hexFgDimLight   = "#6b7394"
+	hexFgDimmer     = "#414868"
+	hexFgDimmest    = "#3b3f56"
+	hexGreen        = "#9ece6a"
+	hexAmber        = "#e0af68"
+	hexPink         = "#f7768e"
+	hexCyan         = "#7dcfff"
+	hexPillBg       = "#1e2235"
+	hexPillBgLight  = "#dde1f5"
+	hexSelRowBg     = "#1f2335"
+	hexSelRowBgLite = "#e0e6ff"
+	hexTabActiveBg  = "#222436"
+	hexTabActiveBgL = "#d6dcef"
+	hexSep          = "#2f3245"
+)
+
+// Accent is the primary highlight colour, used for the TUI title, cursor
+// bar, active tab foreground, and tag foreground.
+var Accent = lipgloss.AdaptiveColor{Light: hexAccentLight, Dark: hexAccent}
 
 // Shared styles.
 var (
-	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "240", Dark: "248"})
-	IDStyle     = lipgloss.NewStyle().Faint(true)
-	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
-	FooterStyle = lipgloss.NewStyle().Faint(true)
+	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFg})
+	IDStyle     = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFgDimmer})
+	DoneStyle   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: hexFgDimmer, Dark: hexFgDimmest}).Strikethrough(true)
+	FooterStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFgDim})
 
-	// Pill colour pair — soft slate, used by both the rounded caps
-	// (foreground = body bg) and the body itself. Slightly bluer than a
-	// pure grey so the chips read as part of the colour palette instead
-	// of a neutral wash.
-	pillBg = lipgloss.AdaptiveColor{Light: "188", Dark: "60"}
-	pillFg = lipgloss.AdaptiveColor{Light: "237", Dark: "252"}
+	// Pill colours come straight from the design: blue text on a very
+	// dark blue background, not grey. The cap glyphs use the body bg as
+	// their foreground so they "round off" the body's rectangle.
+	pillBg = lipgloss.AdaptiveColor{Light: hexPillBgLight, Dark: hexPillBg}
+	pillFg = lipgloss.AdaptiveColor{Light: hexAccentLight, Dark: hexAccent}
 
 	pillCapStyle = lipgloss.NewStyle().Foreground(pillBg)
 	// Padding 0,1 = one cell of bg-coloured space on each side of the tag
@@ -63,36 +87,35 @@ const (
 
 var statusGlyph = map[task.Status]string{
 	task.StatusTodo:       "○",
-	task.StatusInProgress: "●",
+	task.StatusInProgress: "◉", // bullseye — design's "in-progress" mark
 	task.StatusBlocked:    "⊘",
 	task.StatusDone:       "✓",
 }
 
-// StatusColor returns the ANSI palette colour for a status. Uses the
-// 256-colour palette to match a modern, slightly muted look.
+// StatusColor returns the design's exact colour for each status.
 func StatusColor(s task.Status) lipgloss.Color {
 	switch s {
 	case task.StatusInProgress:
-		return lipgloss.Color("214") // amber
+		return lipgloss.Color(hexAccent)
 	case task.StatusBlocked:
-		return lipgloss.Color("198") // pink/red
+		return lipgloss.Color(hexPink)
 	case task.StatusDone:
-		return lipgloss.Color("78") // green
+		return lipgloss.Color(hexGreen)
 	default:
-		return lipgloss.Color("244") // muted grey
+		return lipgloss.Color(hexFgDimmer) // very dim for empty todo circle
 	}
 }
 
-// PriorityColor returns the ANSI palette colour for a priority. The same
-// modern palette as statuses, biased toward warm = important, cool = relaxed.
+// PriorityColor returns the design's priority swatch: pink high, amber
+// medium, cyan low.
 func PriorityColor(p task.Priority) lipgloss.Color {
 	switch p {
 	case task.PriorityHigh:
-		return lipgloss.Color("198") // hot pink
+		return lipgloss.Color(hexPink)
 	case task.PriorityMedium:
-		return lipgloss.Color("214") // amber
+		return lipgloss.Color(hexAmber)
 	default:
-		return lipgloss.Color("75") // cool blue
+		return lipgloss.Color(hexCyan)
 	}
 }
 
@@ -105,28 +128,30 @@ func Bullet(s task.Status) string {
 	return lipgloss.NewStyle().Foreground(StatusColor(s)).Render(statusGlyph[s])
 }
 
-// Priority renders the priority as a single colour-coded filled dot,
-// the visual shorthand most modern task UIs use. Returns the empty
-// string when no priority is set.
+// Priority renders the priority as a small coloured square — the design
+// shows it as a 7×7 rounded rect, which a black-square glyph approximates
+// best in a terminal. Returns the empty string when no priority is set.
 func Priority(p task.Priority) string {
 	if p == "" {
 		return ""
 	}
-	return lipgloss.NewStyle().Foreground(PriorityColor(p)).Render("●")
+	return lipgloss.NewStyle().Foreground(PriorityColor(p)).Render("■")
 }
 
 // Due renders a due date as a short relative label — "today", "2d",
 // "3w" — falling back to "MMM DD" once we're more than a month out (or
-// in). Past dates are negative. Colour: pink when overdue, amber when
-// within three days, faint otherwise.
+// in). Colours follow the design: pink for overdue/today, amber for
+// "soon", faint otherwise.
 func Due(due time.Time) string {
 	now := time.Now()
 	label := relativeDue(now, due)
 	switch {
 	case due.Before(now) && !sameDay(due, now):
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("198")).Render(label)
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(hexPink)).Render(label)
+	case sameDay(due, now):
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(hexPink)).Render(label)
 	case due.Before(now.AddDate(0, 0, 3)):
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render(label)
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(hexAmber)).Render(label)
 	default:
 		return FooterStyle.Render(label)
 	}

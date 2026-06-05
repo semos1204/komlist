@@ -24,22 +24,27 @@ import (
 
 var (
 	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
-	helpStyle  = lipgloss.NewStyle().Faint(true)
+	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#6b7394", Dark: "#565f89"})
 
-	// cursorBarStyle paints the thin accent line on the very left of the
-	// cursor row, on top of the wider soft-blue band.
+	// Coloured keybind labels — the keys themselves in accent blue,
+	// surrounding action text in muted text colour.
+	helpKeyStyle    = lipgloss.NewStyle().Foreground(render.Accent)
+	helpActionStyle = helpStyle
+	helpSepStyle    = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#d6dcef", Dark: "#2f3245"})
+
+	// cursorBarStyle paints the thin accent bar at column 0 of the cursor
+	// row; the wider band uses a much more subtle slate-blue tint.
 	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
 
-	// Tab bar styles. The active tab gets a soft pill background to stand
-	// out; inactive tabs are just dim labels.
+	// Tab bar styles match the design's tokyo-night chip look.
 	activeTabStyle = lipgloss.NewStyle().
-			Background(lipgloss.AdaptiveColor{Light: "240", Dark: "240"}).
-			Foreground(lipgloss.AdaptiveColor{Light: "231", Dark: "231"}).
+			Background(lipgloss.AdaptiveColor{Light: "#d6dcef", Dark: "#222436"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "#1a1b26", Dark: "#c0caf5"}).
 			Bold(true).
 			Padding(0, 1)
 
 	inactiveTabStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "245"}).
+				Foreground(lipgloss.AdaptiveColor{Light: "#6b7394", Dark: "#565f89"}).
 				Padding(0, 1)
 )
 
@@ -617,7 +622,10 @@ func selectedRowBgSeq() string {
 }
 
 var (
-	selectedRowBg       = lipgloss.AdaptiveColor{Light: "153", Dark: "25"}
+	// Very subtle slate-blue tint, almost imperceptible against the dark
+	// terminal background — the accent bar at column 0 is what actually
+	// signals the cursor row.
+	selectedRowBg       = lipgloss.AdaptiveColor{Light: "#e0e6ff", Dark: "#1f2335"}
 	cachedSelectedBgSeq string
 )
 
@@ -708,10 +716,27 @@ func (m model) bottomBar() string {
 	case modeConfirmDelete:
 		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.targetID))
 	default:
-		line1 := " ↑↓ nav · ⏎ cycle · d done · a add · e rename · p prio · t tags · u due · R recur · x del"
-		line2 := " g group · s tab · f tag · c clear · r reload · q quit"
-		return helpStyle.Render(line1) + "\n" + helpStyle.Render(line2)
+		line1 := helpBindings(
+			"↑↓", "nav", "⏎", "cycle", "d", "done",
+			"a", "add", "e", "rename", "p", "prio",
+			"t", "tags", "u", "due", "R", "recur", "x", "del",
+		)
+		line2 := helpBindings(
+			"g", "group", "s", "tab", "f", "tag",
+			"c", "clear", "r", "reload", "q", "quit",
+		)
+		return " " + line1 + "\n " + line2
 	}
+}
+
+// helpBindings interleaves key/action pairs styled with the design's
+// blue keys, muted action text and a very dim · separator.
+func helpBindings(pairs ...string) string {
+	parts := make([]string, 0, len(pairs)/2)
+	for i := 0; i+1 < len(pairs); i += 2 {
+		parts = append(parts, helpKeyStyle.Render(pairs[i])+" "+helpActionStyle.Render(pairs[i+1]))
+	}
+	return strings.Join(parts, helpSepStyle.Render(" · "))
 }
 
 // rowWidth returns the width used to pad the selection bar to full-width,
