@@ -23,19 +23,16 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-	helpStyle  = lipgloss.NewStyle().Faint(true)
-
-	selectedRowStyle = lipgloss.NewStyle().
-				Bold(true).
-				Background(lipgloss.AdaptiveColor{Light: "252", Dark: "238"}).
-				Foreground(lipgloss.AdaptiveColor{Light: "16", Dark: "231"})
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
+	helpStyle      = lipgloss.NewStyle().Faint(true)
+	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
 )
 
 const (
-	// defaultRowWidth is the selection-bar width used before the first
-	// WindowSizeMsg arrives. Replaced once the real terminal width is known.
-	defaultRowWidth = 60
+	// cursorBar is the accent vertical bar that marks the row under the
+	// cursor. It is one column wide so a non-cursor row indented with two
+	// spaces aligns with "▎ ".
+	cursorBar = "▎"
 	// inputRightMargin keeps the textinput field a few columns away from the
 	// right edge so the caret never touches the border.
 	inputRightMargin = 10
@@ -530,12 +527,11 @@ func (m model) renderTasks() string {
 				prev = bucket
 			}
 		}
+		prefix := "  "
 		if i == m.cursor {
-			plain := "› " + render.TaskLinePlain(t, m.blocked[t.ID])
-			b.WriteString(selectedRowStyle.Width(m.rowWidth()).Render(plain) + "\n")
-		} else {
-			b.WriteString("  " + render.TaskLine(t, m.blocked[t.ID]) + "\n")
+			prefix = cursorBarStyle.Render(cursorBar) + " "
 		}
+		b.WriteString(prefix + render.TaskLine(t, m.blocked[t.ID]) + "\n")
 	}
 	return b.String()
 }
@@ -572,17 +568,10 @@ func (m model) bottomBar() string {
 	case modeConfirmDelete:
 		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.targetID))
 	default:
-		line1 := " ↑/↓ move · space cycle · d done · a add · e rename · p prio · t tags · u due · R recur · x delete"
+		line1 := " ↑↓ nav · ⏎ cycle · d done · a add · e rename · p prio · t tags · u due · R recur · x del"
 		line2 := " g group · s status · f tag · c clear · r reload · q quit"
 		return helpStyle.Render(line1) + "\n" + helpStyle.Render(line2)
 	}
-}
-
-func (m model) rowWidth() int {
-	if m.width > 0 {
-		return m.width
-	}
-	return defaultRowWidth
 }
 
 func reorderByFirstTag(tasks []task.Task) []task.Task {

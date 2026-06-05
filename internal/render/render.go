@@ -2,6 +2,15 @@
 // (internal/cli) and the interactive TUI (internal/tui), so both render tasks
 // consistently. lipgloss/termenv disables colour automatically when stdout is
 // not a TTY or NO_COLOR is set.
+//
+// The visual language is deliberately minimal:
+//
+//   - status glyphs progress visually from empty to full: ○ ◐ ⊘ ●
+//   - priority is a single bold colour-coded letter (h/m/l), not a word
+//   - the due date is a flag plus a short Jan 02 label, coloured red when
+//     overdue and yellow when within three days
+//   - the cursor in the TUI is a thin vertical accent bar, not a heavy
+//     full-row background — so a row's per-element colours stay readable.
 package render
 
 import (
@@ -18,19 +27,29 @@ import (
 // grouped views.
 const UntaggedGroup = "(untagged)"
 
+// Accent is the primary highlight colour, used for the TUI title and cursor
+// bar. Adaptive so it stays legible on light and dark terminals.
+var Accent = lipgloss.AdaptiveColor{Light: "27", Dark: "39"}
+
 // Shared styles.
 var (
-	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	GroupStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.AdaptiveColor{Light: "240", Dark: "248"})
 	IDStyle     = lipgloss.NewStyle().Faint(true)
 	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
 	FooterStyle = lipgloss.NewStyle().Faint(true)
 )
 
 var statusGlyph = map[task.Status]string{
-	task.StatusTodo:       "☐",
-	task.StatusInProgress: "▶",
+	task.StatusTodo:       "○",
+	task.StatusInProgress: "◐",
 	task.StatusBlocked:    "⊘",
-	task.StatusDone:       "✔",
+	task.StatusDone:       "●",
+}
+
+var priorityLetter = map[task.Priority]string{
+	task.PriorityHigh:   "h",
+	task.PriorityMedium: "m",
+	task.PriorityLow:    "l",
 }
 
 // StatusColor returns the ANSI palette colour for a status.
@@ -59,23 +78,29 @@ func PriorityColor(p task.Priority) lipgloss.Color {
 	}
 }
 
-// ID renders a task ID like "12.".
-func ID(id int) string { return IDStyle.Render(fmt.Sprintf("%d.", id)) }
+// ID renders a task ID right-aligned in a 3-column field so single- and
+// double-digit ids line up cleanly.
+func ID(id int) string { return IDStyle.Render(fmt.Sprintf("%3d", id)) }
 
 // Bullet renders the coloured status glyph.
 func Bullet(s task.Status) string {
 	return lipgloss.NewStyle().Foreground(StatusColor(s)).Render(statusGlyph[s])
 }
 
-// Priority renders a coloured priority label like "·high".
+// Priority renders the priority as a single bold colour-coded letter
+// (h/m/l). Returns the empty string when no priority is set.
 func Priority(p task.Priority) string {
-	return lipgloss.NewStyle().Foreground(PriorityColor(p)).Render("·" + string(p))
+	letter, ok := priorityLetter[p]
+	if !ok {
+		return ""
+	}
+	return lipgloss.NewStyle().Bold(true).Foreground(PriorityColor(p)).Render(letter)
 }
 
-// Due renders a due date, coloured red when overdue and yellow when within
-// three days.
+// Due renders a due date as "⚐ Jan 02", coloured red when overdue and
+// yellow when within three days; otherwise faint.
 func Due(due time.Time) string {
-	label := "⚑ " + due.Format(time.DateOnly)
+	label := "⚐ " + due.Format("Jan 02")
 	now := time.Now()
 	switch {
 	case due.Before(now):
@@ -83,17 +108,17 @@ func Due(due time.Time) string {
 	case due.Before(now.AddDate(0, 0, 3)):
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(label)
 	default:
-		return IDStyle.Render(label)
+		return FooterStyle.Render(label)
 	}
 }
 
-// Recur renders a recurrence marker like "⟳weekly".
-func Recur(r task.Recurrence) string { return IDStyle.Render("⟳" + string(r)) }
+// Recur renders a recurrence marker like "⟳ weekly".
+func Recur(r task.Recurrence) string { return FooterStyle.Render("⟳ " + string(r)) }
 
-// TaskLine renders a single task as "id. bullet [🔒] title ·prio ⚑due ⟳recur".
-// Callers add their own leading indent or cursor.
+// TaskLine renders a single task as "bullet id title h ⚐ Jan 02 ⟳ weekly".
+// Callers add their own leading indent or cursor marker.
 func TaskLine(t task.Task, blocked bool) string {
-	parts := []string{ID(t.ID), Bullet(t.Status)}
+	parts := []string{Bullet(t.Status), ID(t.ID)}
 	if blocked {
 		parts = append(parts, "\U0001F512")
 	}
@@ -102,35 +127,14 @@ func TaskLine(t task.Task, blocked bool) string {
 		title = DoneStyle.Render(title)
 	}
 	parts = append(parts, title)
-	if t.Priority != "" {
-		parts = append(parts, Priority(t.Priority))
+	if prio := Priority(t.Priority); prio != "" {
+		parts = append(parts, prio)
 	}
 	if t.DueAt != nil {
 		parts = append(parts, Due(*t.DueAt))
 	}
 	if t.Recur != task.RecurNone {
 		parts = append(parts, Recur(t.Recur))
-	}
-	return strings.Join(parts, " ")
-}
-
-// TaskLinePlain renders the same content as TaskLine but without any embedded
-// styling, so callers can apply a single uniform style (e.g. a selection
-// background) over the whole line.
-func TaskLinePlain(t task.Task, blocked bool) string {
-	parts := []string{fmt.Sprintf("%d.", t.ID), statusGlyph[t.Status]}
-	if blocked {
-		parts = append(parts, "\U0001F512")
-	}
-	parts = append(parts, t.Title)
-	if t.Priority != "" {
-		parts = append(parts, "·"+string(t.Priority))
-	}
-	if t.DueAt != nil {
-		parts = append(parts, "⚑ "+t.DueAt.Format(time.DateOnly))
-	}
-	if t.Recur != task.RecurNone {
-		parts = append(parts, "⟳"+string(t.Recur))
 	}
 	return strings.Join(parts, " ")
 }

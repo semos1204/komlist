@@ -158,8 +158,11 @@ $ kl unblock 3 4     # remove the dependency
 $ kl ui
 ```
 
-A Bubble Tea terminal app over your tasks. The cursor row is highlighted
-with a full-width background bar; navigate with arrow keys (or `j`/`k`).
+A Bubble Tea terminal app over your tasks. Charm-style minimalist
+rendering — circular status glyphs `○ ◐ ⊘ ●` showing the lifecycle from
+empty to full, a thin accent bar `▎` marking the row under the cursor (no
+heavy full-width highlight), a single colour-coded letter for priority and
+a short flag-and-month due date. Navigate with arrow keys (or `j`/`k`).
 
 | Key | Action |
 |---|---|
