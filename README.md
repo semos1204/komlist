@@ -164,6 +164,10 @@ with a full-width background bar; navigate with arrow keys (or `j`/`k`).
 | `d` | mark done |
 | `a` | add a task — opens an input bar |
 | `e` | rename the selected task |
+| `p` | cycle priority (unset → low → medium → high → unset) |
+| `t` | set tags — `tag1,tag2` (empty clears) |
+| `u` | set due date — `YYYY-MM-DD` (empty clears) |
+| `R` | cycle recurrence (none → daily → weekly → monthly → none) |
 | `x` | delete (with `y/n` confirmation) |
 | `g` | toggle grouping by first tag |
 | `s` | cycle the status filter |
@@ -172,7 +176,9 @@ with a full-width background bar; navigate with arrow keys (or `j`/`k`).
 | `r` | reload from store |
 | `q` / `esc` / `ctrl+c` | quit |
 
-In an input field, `esc` cancels and `enter` commits.
+In an input field, `esc` cancels and `enter` commits. Interval recurrences
+like `2w` or `3d` are only reachable from the CLI (`kl recur`); the TUI
+cycle covers the keyword cadences.
 
 ### Board view
 

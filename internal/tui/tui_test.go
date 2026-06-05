@@ -278,6 +278,130 @@ func TestTUI_ClearFilters(t *testing.T) {
 	}
 }
 
+func TestTUI_CyclePriority(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	if m.tasks[m.cursor].Priority != "" {
+		t.Fatalf("initial priority should be unset, got %q", m.tasks[m.cursor].Priority)
+	}
+	// "" -> low
+	m = step(m, key("p"))
+	if got := taskByID(m.tasks, id).Priority; got != task.PriorityLow {
+		t.Errorf("after 1×p, priority = %q, want low", got)
+	}
+	// low -> medium -> high -> "" back
+	m = step(m, key("p"))
+	m = step(m, key("p"))
+	if got := taskByID(m.tasks, id).Priority; got != task.PriorityHigh {
+		t.Errorf("after 3×p, priority = %q, want high", got)
+	}
+	m = step(m, key("p"))
+	if got := taskByID(m.tasks, id).Priority; got != "" {
+		t.Errorf("after 4×p, priority should clear, got %q", got)
+	}
+}
+
+func TestTUI_CycleRecurrence(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	m = step(m, key("R"))
+	if got := taskByID(m.tasks, id).Recur; got != task.RecurDaily {
+		t.Errorf("after 1×R, recur = %q, want daily", got)
+	}
+	m = step(m, key("R"))
+	m = step(m, key("R"))
+	if got := taskByID(m.tasks, id).Recur; got != task.RecurMonthly {
+		t.Errorf("after 3×R, recur = %q, want monthly", got)
+	}
+	m = step(m, key("R"))
+	if got := taskByID(m.tasks, id).Recur; got != task.RecurNone {
+		t.Errorf("after 4×R, recur should clear, got %q", got)
+	}
+}
+
+func TestTUI_EditTags(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	m = step(m, key("t"))
+	if m.mode != modeEditTags {
+		t.Fatalf("mode = %v, want modeEditTags", m.mode)
+	}
+	m.input.SetValue("work,urgent")
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	got := taskByID(m.tasks, id).Tags
+	if len(got) != 2 || got[0] != "work" || got[1] != "urgent" {
+		t.Errorf("tags = %v, want [work urgent]", got)
+	}
+}
+
+func TestTUI_EditTagsClear(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	if _, err := m.svc.SetTags(m.ctx, id, []string{"existing"}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	m.reload()
+	m = step(m, key("t"))
+	m.input.SetValue("")
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if got := taskByID(m.tasks, id).Tags; len(got) != 0 {
+		t.Errorf("tags should clear, got %v", got)
+	}
+}
+
+func TestTUI_EditDue(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	m = step(m, key("u"))
+	if m.mode != modeEditDue {
+		t.Fatalf("mode = %v, want modeEditDue", m.mode)
+	}
+	m.input.SetValue("2026-06-30")
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	got := taskByID(m.tasks, id).DueAt
+	if got == nil || got.Format(time.DateOnly) != "2026-06-30" {
+		t.Errorf("due = %v, want 2026-06-30", got)
+	}
+}
+
+func TestTUI_EditDueClear(t *testing.T) {
+	m := testModel(t)
+	id := m.tasks[m.cursor].ID
+	due := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
+	if _, err := m.svc.SetDueAt(m.ctx, id, &due); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	m.reload()
+	m = step(m, key("u"))
+	m.input.SetValue("")
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if got := taskByID(m.tasks, id).DueAt; got != nil {
+		t.Errorf("due should clear, got %v", got)
+	}
+}
+
+func TestTUI_EditDueInvalid(t *testing.T) {
+	m := testModel(t)
+	m = step(m, key("u"))
+	m.input.SetValue("not-a-date")
+	m = step(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.err == nil {
+		t.Error("expected error for invalid date")
+	}
+}
+
+// taskByID is a small lookup used by the field-edit tests; returns the
+// zero value when the ID is not in the list (the caller's assertion then
+// surfaces the mistake clearly).
+func taskByID(tasks []task.Task, id int) task.Task {
+	for _, t := range tasks {
+		if t.ID == id {
+			return t
+		}
+	}
+	return task.Task{}
+}
+
 func TestTUI_GroupedToggle(t *testing.T) {
 	m := testModelTagged(t)
 	if m.grouped {

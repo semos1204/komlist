@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +47,8 @@ const (
 	modeNormal mode = iota
 	modeAdd
 	modeEdit
+	modeEditTags
+	modeEditDue
 	modeFilterTag
 	modeConfirmDelete
 )
@@ -121,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		switch m.mode {
-		case modeAdd, modeEdit, modeFilterTag:
+		case modeAdd, modeEdit, modeEditTags, modeEditDue, modeFilterTag:
 			return m.handleInputKey(msg)
 		case modeConfirmDelete:
 			return m.handleConfirmKey(msg)
@@ -146,6 +149,10 @@ var normalHandlers = map[string]func(*model){
 	"r":     (*model).reload,
 	"a":     (*model).enterAdd,
 	"e":     (*model).enterEdit,
+	"p":     (*model).cyclePriority,
+	"t":     (*model).enterEditTags,
+	"u":     (*model).enterEditDue,
+	"R":     (*model).cycleRecurrence,
 	"x":     (*model).enterConfirmDelete,
 	"g":     (*model).toggleGrouped,
 	"s":     (*model).cycleStatusAndReload,
@@ -219,30 +226,47 @@ func (m model) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) enterAdd() {
-	m.input.SetValue("")
-	m.input.Placeholder = "new task title"
+// enterInput prepares the textinput field for one of the input modes. The
+// targetID identifies the task being acted on (0 when irrelevant, e.g. add
+// or filter).
+func (m *model) enterInput(md mode, value, placeholder string, targetID int) {
+	m.input.SetValue(value)
+	m.input.Placeholder = placeholder
 	m.input.Focus()
-	m.mode = modeAdd
+	m.targetID = targetID
+	m.mode = md
+}
+
+func (m *model) enterAdd() {
+	m.enterInput(modeAdd, "", "new task title", 0)
 }
 
 func (m *model) enterEdit() {
+	if t, ok := m.currentTask(); ok {
+		m.enterInput(modeEdit, t.Title, "", t.ID)
+	}
+}
+
+func (m *model) enterFilterTag() {
+	m.enterInput(modeFilterTag, m.tagFilter, "tag (empty clears)", 0)
+}
+
+func (m *model) enterEditTags() {
+	if t, ok := m.currentTask(); ok {
+		m.enterInput(modeEditTags, strings.Join(t.Tags, ","), "tag1,tag2 (empty clears)", t.ID)
+	}
+}
+
+func (m *model) enterEditDue() {
 	t, ok := m.currentTask()
 	if !ok {
 		return
 	}
-	m.input.SetValue(t.Title)
-	m.input.Placeholder = ""
-	m.input.Focus()
-	m.targetID = t.ID
-	m.mode = modeEdit
-}
-
-func (m *model) enterFilterTag() {
-	m.input.SetValue(m.tagFilter)
-	m.input.Placeholder = "tag (empty clears)"
-	m.input.Focus()
-	m.mode = modeFilterTag
+	value := ""
+	if t.DueAt != nil {
+		value = t.DueAt.Format(time.DateOnly)
+	}
+	m.enterInput(modeEditDue, value, "YYYY-MM-DD (empty clears)", t.ID)
 }
 
 func (m *model) enterConfirmDelete() {
@@ -266,28 +290,75 @@ func (m *model) commitInput() {
 	val := strings.TrimSpace(m.input.Value())
 	switch m.mode {
 	case modeAdd:
-		if val != "" {
-			t, err := m.svc.Add(m.ctx, val)
-			if err != nil {
-				m.err = err
-			} else {
-				m.reload()
-				m.focusTask(t.ID)
-			}
-		}
+		m.commitAdd(val)
 	case modeEdit:
-		if val != "" && m.targetID != 0 {
-			if _, err := m.svc.Rename(m.ctx, m.targetID, val); err != nil {
-				m.err = err
-			}
-			m.reload()
-		}
+		m.commitRename(val)
+	case modeEditTags:
+		m.commitTags(val)
+	case modeEditDue:
+		m.commitDue(val)
 	case modeFilterTag:
 		m.tagFilter = val
 		m.cursor = 0
 		m.reload()
 	}
 	m.exitInput()
+}
+
+func (m *model) commitAdd(val string) {
+	if val == "" {
+		return
+	}
+	t, err := m.svc.Add(m.ctx, val)
+	if err != nil {
+		m.err = err
+		return
+	}
+	m.reload()
+	m.focusTask(t.ID)
+}
+
+func (m *model) commitRename(val string) {
+	if val == "" || m.targetID == 0 {
+		return
+	}
+	if _, err := m.svc.Rename(m.ctx, m.targetID, val); err != nil {
+		m.err = err
+	}
+	m.reload()
+}
+
+func (m *model) commitTags(val string) {
+	if m.targetID == 0 {
+		return
+	}
+	var tags []string
+	if val != "" {
+		tags = strings.Split(val, ",")
+	}
+	if _, err := m.svc.SetTags(m.ctx, m.targetID, tags); err != nil {
+		m.err = err
+	}
+	m.reload()
+}
+
+func (m *model) commitDue(val string) {
+	if m.targetID == 0 {
+		return
+	}
+	var due *time.Time
+	if val != "" && val != "none" {
+		parsed, err := time.Parse(time.DateOnly, val)
+		if err != nil {
+			m.err = fmt.Errorf("invalid date %q (expected YYYY-MM-DD)", val)
+			return
+		}
+		due = &parsed
+	}
+	if _, err := m.svc.SetDueAt(m.ctx, m.targetID, due); err != nil {
+		m.err = err
+	}
+	m.reload()
 }
 
 func (m *model) focusTask(id int) {
@@ -309,24 +380,73 @@ var statusCycle = []task.Status{
 	task.StatusDone,
 }
 
+// priorityCycle is the rotation order for the `p` keybind. The empty
+// priority stands for "unset".
+var priorityCycle = []task.Priority{
+	"",
+	task.PriorityLow,
+	task.PriorityMedium,
+	task.PriorityHigh,
+}
+
+// recurrenceCycle is the rotation order for the `R` keybind. Interval forms
+// like "2w" are reachable from the CLI; the TUI cycles keywords only.
+var recurrenceCycle = []task.Recurrence{
+	task.RecurNone,
+	task.RecurDaily,
+	task.RecurWeekly,
+	task.RecurMonthly,
+}
+
+// nextInCycle returns the value immediately after cur in cycle, wrapping
+// around. cur not found in cycle yields the first element.
+func nextInCycle[T comparable](cycle []T, cur T) T {
+	for i, v := range cycle {
+		if v == cur {
+			return cycle[(i+1)%len(cycle)]
+		}
+	}
+	return cycle[0]
+}
+
 func (m *model) cycleStatusFilter() {
 	var cur task.Status
 	if m.statusFilter != nil {
 		cur = *m.statusFilter
 	}
-	next := statusCycle[0]
-	for i, s := range statusCycle {
-		if s == cur {
-			next = statusCycle[(i+1)%len(statusCycle)]
-			break
-		}
-	}
+	next := nextInCycle(statusCycle, cur)
 	if next == "" {
 		m.statusFilter = nil
 	} else {
 		m.statusFilter = &next
 	}
 	m.cursor = 0
+}
+
+func (m *model) cyclePriority() {
+	t, ok := m.currentTask()
+	if !ok {
+		return
+	}
+	next := nextInCycle(priorityCycle, t.Priority)
+	if _, err := m.svc.SetPriority(m.ctx, t.ID, next); err != nil {
+		m.err = err
+		return
+	}
+	m.reload()
+}
+
+func (m *model) cycleRecurrence() {
+	t, ok := m.currentTask()
+	if !ok {
+		return
+	}
+	next := nextInCycle(recurrenceCycle, t.Recur)
+	if _, err := m.svc.SetRecurrence(m.ctx, t.ID, next); err != nil {
+		m.err = err
+		return
+	}
+	m.reload()
 }
 
 func (m *model) currentTask() (task.Task, bool) {
@@ -440,13 +560,19 @@ func (m model) bottomBar() string {
 	case modeAdd:
 		return helpStyle.Render(" add: ") + m.input.View()
 	case modeEdit:
-		return helpStyle.Render(" edit: ") + m.input.View()
+		return helpStyle.Render(" rename: ") + m.input.View()
+	case modeEditTags:
+		return helpStyle.Render(" tags: ") + m.input.View()
+	case modeEditDue:
+		return helpStyle.Render(" due: ") + m.input.View()
 	case modeFilterTag:
 		return helpStyle.Render(" tag filter: ") + m.input.View()
 	case modeConfirmDelete:
 		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.targetID))
 	default:
-		return helpStyle.Render(" ↑/↓ move · space cycle · d done · a add · e edit · x delete · g group · s status · f tag · c clear · r reload · q quit")
+		line1 := " ↑/↓ move · space cycle · d done · a add · e rename · p prio · t tags · u due · R recur · x delete"
+		line2 := " g group · s status · f tag · c clear · r reload · q quit"
+		return helpStyle.Render(line1) + "\n" + helpStyle.Render(line2)
 	}
 }
 

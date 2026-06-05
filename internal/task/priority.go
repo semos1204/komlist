@@ -42,12 +42,16 @@ func (p Priority) Rank() int {
 	}
 }
 
-// ParsePriority parses s into a Priority. It returns an error listing the
-// valid values when s is not recognized.
+// ParsePriority parses s into a Priority. "none" (and the empty string) map
+// to an unset Priority; any other unknown value returns an error listing the
+// valid keywords.
 func ParsePriority(s string) (Priority, error) {
+	if s == "none" || s == "" {
+		return "", nil
+	}
 	p := Priority(s)
 	if !p.Valid() {
-		return "", fmt.Errorf("invalid priority %q (valid: %v)", s, AllPriorities())
+		return "", fmt.Errorf("invalid priority %q (valid: none, %v)", s, AllPriorities())
 	}
 	return p, nil
 }

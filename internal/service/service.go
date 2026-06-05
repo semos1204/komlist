@@ -176,9 +176,10 @@ func (s *TaskService) SetTags(ctx context.Context, id int, tags []string) (task.
 	return s.mutate(ctx, id, func(t *task.Task) { t.Tags = cleaned })
 }
 
-// SetPriority changes a task's priority.
+// SetPriority changes (or clears) a task's priority. An empty Priority
+// clears the value; any other unknown priority returns ErrInvalidPriority.
 func (s *TaskService) SetPriority(ctx context.Context, id int, p task.Priority) (task.Task, error) {
-	if !p.Valid() {
+	if p != "" && !p.Valid() {
 		return task.Task{}, fmt.Errorf("%w: %q (valid: %v)", ErrInvalidPriority, p, task.AllPriorities())
 	}
 	return s.mutate(ctx, id, func(t *task.Task) { t.Priority = p })

@@ -49,6 +49,9 @@
 - ✅ **Richer TUI** — `kl ui` now groups by first tag (`g`), adds (`a`) /
   renames (`e`) / deletes (`x`) tasks in place via a bubbles textinput, and
   filters by status (`s`) and tag (`f`); `c` clears filters.
+- ✅ **In-TUI field editing** — `p` cycles priority, `t` sets tags, `u` sets
+  due date, `R` cycles recurrence. Service.SetPriority now accepts an empty
+  value as "clear", and `kl prio <id> none` mirrors due/recur for symmetry.
 
 ## Possible next steps
 
@@ -58,6 +61,6 @@
   and command descriptions also translate.
 - **Localized TUI labels** — extend the i18n catalog to cover `add`/`edit`/
   filter labels and key hints in `internal/tui`.
-- **Edit more fields from the TUI** — priority, due date, tags, recurrence,
-  dependencies.
+- **Edit dependencies from the TUI** — blocking/unblocking from `kl ui`
+  needs a two-task picker UX; out of scope for now (use `kl block`).
 - **Cron-like recurrence** — "1st of each month" rules beyond fixed intervals.
