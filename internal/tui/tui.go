@@ -664,7 +664,9 @@ func reorderByFirstTag(tasks []task.Task) []task.Task {
 }
 
 // Run starts the interactive program and blocks until the user quits.
+// Uses alt-screen mode so the TUI takes over the terminal cleanly (like
+// vim or htop) instead of rendering on top of whatever was on screen.
 func Run(svc *service.TaskService) error {
-	_, err := tea.NewProgram(newModel(svc)).Run()
+	_, err := tea.NewProgram(newModel(svc), tea.WithAltScreen()).Run()
 	return err
 }
