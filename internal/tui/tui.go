@@ -25,7 +25,39 @@ import (
 var (
 	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
 	helpStyle  = lipgloss.NewStyle().Faint(true)
+
+	// Tab bar styles. The active tab gets a soft pill background to stand
+	// out; inactive tabs are just dim labels.
+	activeTabStyle = lipgloss.NewStyle().
+			Background(lipgloss.AdaptiveColor{Light: "240", Dark: "240"}).
+			Foreground(lipgloss.AdaptiveColor{Light: "231", Dark: "231"}).
+			Bold(true).
+			Padding(0, 1)
+
+	inactiveTabStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "245"}).
+				Padding(0, 1)
 )
+
+type tab int
+
+// Tab values for the top-of-screen filter bar.
+const (
+	tabAll tab = iota
+	tabActive
+	tabDone
+)
+
+func (t tab) label() string {
+	switch t {
+	case tabActive:
+		return "active"
+	case tabDone:
+		return "done"
+	default:
+		return "all"
+	}
+}
 
 const (
 	// defaultRowWidth is the selection-bar width used before the first
@@ -59,8 +91,8 @@ type model struct {
 	width   int
 	grouped bool
 
-	statusFilter *task.Status
-	tagFilter    string
+	tab       tab
+	tagFilter string
 
 	mode     mode
 	input    textinput.Model
@@ -81,13 +113,25 @@ func newModel(svc *service.TaskService) model {
 
 func (m *model) reload() {
 	filter := service.ListFilter{Sort: service.SortByUrgency, Tag: m.tagFilter}
-	if m.statusFilter != nil {
-		filter.Status = m.statusFilter
+	if m.tab == tabDone {
+		done := task.StatusDone
+		filter.Status = &done
 	}
 	tasks, err := m.svc.List(m.ctx, filter)
 	if err != nil {
 		m.err = err
 		return
+	}
+	// "active" = anything but done. Filter client-side since ListFilter
+	// only accepts a single positive Status.
+	if m.tab == tabActive {
+		kept := tasks[:0]
+		for _, t := range tasks {
+			if t.Status != task.StatusDone {
+				kept = append(kept, t)
+			}
+		}
+		tasks = kept
 	}
 	blocked, err := m.svc.BlockedSet(m.ctx)
 	if err != nil {
@@ -181,13 +225,15 @@ func (m *model) toggleGrouped() {
 }
 
 func (m *model) cycleStatusAndReload() {
-	m.cycleStatusFilter()
+	m.tab = (m.tab + 1) % 3
+	m.cursor = 0
 	m.reload()
 }
 
 func (m *model) clearFilters() {
-	m.statusFilter = nil
+	m.tab = tabAll
 	m.tagFilter = ""
+	m.cursor = 0
 	m.reload()
 }
 
@@ -365,16 +411,6 @@ func (m *model) focusTask(id int) {
 	}
 }
 
-// statusCycle is the rotation order for the `s` keybind. The empty status
-// stands for "no filter" (show all).
-var statusCycle = []task.Status{
-	"",
-	task.StatusTodo,
-	task.StatusInProgress,
-	task.StatusBlocked,
-	task.StatusDone,
-}
-
 // priorityCycle is the rotation order for the `p` keybind. The empty
 // priority stands for "unset".
 var priorityCycle = []task.Priority{
@@ -404,20 +440,6 @@ func nextInCycle[T comparable](cycle []T, cur T) T {
 		}
 	}
 	return cycle[0]
-}
-
-func (m *model) cycleStatusFilter() {
-	var cur task.Status
-	if m.statusFilter != nil {
-		cur = *m.statusFilter
-	}
-	next := nextInCycle(statusCycle, cur)
-	if next == "" {
-		m.statusFilter = nil
-	} else {
-		m.statusFilter = &next
-	}
-	m.cursor = 0
 }
 
 func (m *model) cyclePriority() {
@@ -493,6 +515,7 @@ func (m model) View() string {
 	}
 	var b strings.Builder
 	b.WriteString(titleStyle.Render(" komlist") + "\n\n")
+	b.WriteString(m.tabBar() + "\n\n")
 	if m.err != nil {
 		b.WriteString("  error: " + m.err.Error() + "\n\n")
 	}
@@ -501,10 +524,14 @@ func (m model) View() string {
 	} else {
 		b.WriteString(m.renderTasks())
 	}
+	b.WriteString("\n")
 	if sb := m.statusBar(); sb != "" {
-		b.WriteString("\n" + sb)
+		b.WriteString(sb)
 	}
-	b.WriteString("\n" + m.bottomBar() + "\n")
+	if pos := m.positionFooter(); pos != "" {
+		b.WriteString(spaceBetween("", pos, m.rowWidth()) + "\n")
+	}
+	b.WriteString(m.bottomBar() + "\n")
 	return b.String()
 }
 
@@ -566,11 +593,11 @@ var (
 	cachedSelectedBgSeq string
 )
 
+// statusBar shows secondary filters (tag filter, grouping) that aren't
+// already represented by the top tab bar. Returns empty when nothing is
+// active.
 func (m model) statusBar() string {
 	var parts []string
-	if m.statusFilter != nil {
-		parts = append(parts, "status="+string(*m.statusFilter))
-	}
 	if m.tagFilter != "" {
 		parts = append(parts, "tag="+m.tagFilter)
 	}
@@ -580,7 +607,62 @@ func (m model) statusBar() string {
 	if len(parts) == 0 {
 		return ""
 	}
-	return helpStyle.Render(" filter: " + strings.Join(parts, " · "))
+	return helpStyle.Render(" " + strings.Join(parts, " · "))
+}
+
+// tabBar renders the all/active/done tabs on the left and a small inline
+// stats summary on the right, separated by enough filler to push the
+// stats to the right edge.
+func (m model) tabBar() string {
+	tabs := []tab{tabAll, tabActive, tabDone}
+	cells := make([]string, len(tabs))
+	for i, t := range tabs {
+		style := inactiveTabStyle
+		if t == m.tab {
+			style = activeTabStyle
+		}
+		cells[i] = style.Render(t.label())
+	}
+	left := " " + strings.Join(cells, " ")
+	right := m.statsLine()
+	return spaceBetween(left, right, m.rowWidth())
+}
+
+// statsLine summarises the visible task set: total, high-priority count,
+// and tasks due within three days.
+func (m model) statsLine() string {
+	total := len(m.tasks)
+	high := 0
+	due := 0
+	threshold := time.Now().AddDate(0, 0, 3)
+	for _, t := range m.tasks {
+		if t.Priority == task.PriorityHigh {
+			high++
+		}
+		if t.DueAt != nil && t.DueAt.Before(threshold) {
+			due++
+		}
+	}
+	return helpStyle.Render(fmt.Sprintf("%d tasks · %d high · %d due ", total, high, due))
+}
+
+// positionFooter renders "X / Y" on the right edge so the user knows
+// where they are in the list.
+func (m model) positionFooter() string {
+	if len(m.tasks) == 0 {
+		return ""
+	}
+	return helpStyle.Render(fmt.Sprintf("%d / %d ", m.cursor+1, len(m.tasks)))
+}
+
+// spaceBetween places left at the start of a row and right at the end,
+// padding the middle so the right text touches the right edge.
+func spaceBetween(left, right string, width int) string {
+	used := lipgloss.Width(left) + lipgloss.Width(right)
+	if used >= width {
+		return left + " " + right
+	}
+	return left + strings.Repeat(" ", width-used) + right
 }
 
 func (m model) bottomBar() string {
@@ -599,7 +681,7 @@ func (m model) bottomBar() string {
 		return helpStyle.Render(fmt.Sprintf(" Delete #%d? (y/n)", m.targetID))
 	default:
 		line1 := " ↑↓ nav · ⏎ cycle · d done · a add · e rename · p prio · t tags · u due · R recur · x del"
-		line2 := " g group · s status · f tag · c clear · r reload · q quit"
+		line2 := " g group · s tab · f tag · c clear · r reload · q quit"
 		return helpStyle.Render(line1) + "\n" + helpStyle.Render(line2)
 	}
 }

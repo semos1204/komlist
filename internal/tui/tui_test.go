@@ -217,25 +217,22 @@ func TestTUI_DeleteCancel(t *testing.T) {
 	}
 }
 
-func TestTUI_StatusFilterCycle(t *testing.T) {
+func TestTUI_TabCycle(t *testing.T) {
 	m := testModel(t)
-	if m.statusFilter != nil {
-		t.Fatal("initial filter should be nil")
+	if m.tab != tabAll {
+		t.Fatal("initial tab should be tabAll")
 	}
 	m = step(m, key("s"))
-	if m.statusFilter == nil || *m.statusFilter != task.StatusTodo {
-		t.Errorf("after 1×s, filter = %v, want todo", m.statusFilter)
+	if m.tab != tabActive {
+		t.Errorf("after 1×s, tab = %v, want active", m.tab)
 	}
 	m = step(m, key("s"))
-	if *m.statusFilter != task.StatusInProgress {
-		t.Errorf("after 2×s, filter = %v", *m.statusFilter)
+	if m.tab != tabDone {
+		t.Errorf("after 2×s, tab = %v, want done", m.tab)
 	}
-	// cycle 3 more times: blocked, done, nil
 	m = step(m, key("s"))
-	m = step(m, key("s"))
-	m = step(m, key("s"))
-	if m.statusFilter != nil {
-		t.Errorf("after 5×s, filter = %v, want nil", m.statusFilter)
+	if m.tab != tabAll {
+		t.Errorf("after 3×s, tab = %v, want all (cycle wraps)", m.tab)
 	}
 }
 
@@ -269,12 +266,12 @@ func TestTUI_TagFilter(t *testing.T) {
 
 func TestTUI_ClearFilters(t *testing.T) {
 	m := testModelTagged(t)
-	m = step(m, key("s")) // status filter on
+	m = step(m, key("s")) // cycle to active tab
 	m.tagFilter = "travail"
 	m.reload()
 	m = step(m, key("c"))
-	if m.statusFilter != nil || m.tagFilter != "" {
-		t.Errorf("after c, filters = (%v, %q)", m.statusFilter, m.tagFilter)
+	if m.tab != tabAll || m.tagFilter != "" {
+		t.Errorf("after c, tab=%v, tagFilter=%q", m.tab, m.tagFilter)
 	}
 }
 
