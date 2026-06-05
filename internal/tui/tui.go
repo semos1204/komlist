@@ -26,6 +26,10 @@ var (
 	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
 	helpStyle  = lipgloss.NewStyle().Faint(true)
 
+	// cursorBarStyle paints the thin accent line on the very left of the
+	// cursor row, on top of the wider soft-blue band.
+	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
+
 	// Tab bar styles. The active tab gets a soft pill background to stand
 	// out; inactive tabs are just dim labels.
 	activeTabStyle = lipgloss.NewStyle().
@@ -38,6 +42,8 @@ var (
 				Foreground(lipgloss.AdaptiveColor{Light: "245", Dark: "245"}).
 				Padding(0, 1)
 )
+
+const cursorBar = "▎"
 
 type tab int
 
@@ -560,21 +566,43 @@ func (m model) renderTasks() string {
 	return b.String()
 }
 
-// renderTaskRow lays out one task row. The non-cursor case is a straight
-// "left padding · right" layout. The cursor case shares the same layout
-// but is post-processed with WithRowBackground so the row background
-// survives each inner ANSI reset — the pills and per-element colours
-// stay visible on the blue band.
+// renderTaskRow lays out one task row.
+//
+//   - Non-cursor rows get a plain two-space indent.
+//   - The cursor row gets an accent vertical bar in column 0, then the
+//     same content wrapped in WithRowBackground so the soft-blue band
+//     spans the remaining width while inner styling (pills, priority
+//     dot, due colour) survives each ANSI reset.
 func (m model) renderTaskRow(i int, t task.Task) string {
-	row := m.renderRow(t)
+	body := m.renderRowBody(t)
 	if i != m.cursor {
-		return row
+		return "  " + body
 	}
-	// Pad to full width so the background covers the trailing whitespace.
-	if rem := m.rowWidth() - lipgloss.Width(row); rem > 0 {
-		row += strings.Repeat(" ", rem)
+	// Cursor row: bar (1 cell) + bg band (rowWidth-1 cells).
+	bandWidth := m.rowWidth() - 1
+	band := " " + body // 1-cell bg padding so the text doesn't touch the bar
+	if rem := bandWidth - lipgloss.Width(band); rem > 0 {
+		band += strings.Repeat(" ", rem)
 	}
-	return render.WithRowBackground(row, selectedRowBgSeq())
+	return cursorBarStyle.Render(cursorBar) + render.WithRowBackground(band, selectedRowBgSeq())
+}
+
+// renderRowBody returns the content portion of a row (left half + filler +
+// right half) without the leading indent or cursor marker. Both callers add
+// their own prefix.
+func (m model) renderRowBody(t task.Task) string {
+	left := render.TaskLineLeft(t, m.blocked[t.ID])
+	right := render.TaskLineRight(t)
+	if right == "" {
+		return left
+	}
+	const minFiller = 4
+	// rowWidth - 2 accounts for the 2-cell prefix (indent or bar+space).
+	filler := m.rowWidth() - 2 - lipgloss.Width(left) - lipgloss.Width(right)
+	if filler < minFiller {
+		filler = minFiller
+	}
+	return left + strings.Repeat(" ", filler) + right
 }
 
 // selectedRowBgSeq caches the ANSI sequence for the cursor row's
@@ -693,27 +721,6 @@ func (m model) rowWidth() int {
 		return m.width
 	}
 	return defaultRowWidth
-}
-
-// renderRow lays out a non-cursor row as "  <left> ... <right>" with the
-// right half (tag pills + recur + due) flushed to the terminal's right
-// edge. When the row has nothing right-aligned, it falls back to just the
-// left content.
-func (m model) renderRow(t task.Task) string {
-	left := "  " + render.TaskLineLeft(t, m.blocked[t.ID])
-	right := render.TaskLineRight(t)
-	if right == "" {
-		return left
-	}
-	// At least 4 spaces between the title and the right-side pills so long
-	// titles don't bump into the tag chips. The width-based filler grows
-	// beyond that when the terminal has room.
-	const minFiller = 4
-	filler := m.rowWidth() - lipgloss.Width(left) - lipgloss.Width(right) - 1
-	if filler < minFiller {
-		filler = minFiller
-	}
-	return left + strings.Repeat(" ", filler) + right
 }
 
 func reorderByFirstTag(tasks []task.Task) []task.Task {

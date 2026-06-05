@@ -38,10 +38,12 @@ var (
 	DoneStyle   = lipgloss.NewStyle().Faint(true).Strikethrough(true)
 	FooterStyle = lipgloss.NewStyle().Faint(true)
 
-	// Pill colour pair — soft adaptive grey, used by both the rounded caps
-	// (foreground = body bg) and the body itself.
-	pillBg = lipgloss.AdaptiveColor{Light: "252", Dark: "238"}
-	pillFg = lipgloss.AdaptiveColor{Light: "240", Dark: "248"}
+	// Pill colour pair — soft slate, used by both the rounded caps
+	// (foreground = body bg) and the body itself. Slightly bluer than a
+	// pure grey so the chips read as part of the colour palette instead
+	// of a neutral wash.
+	pillBg = lipgloss.AdaptiveColor{Light: "188", Dark: "60"}
+	pillFg = lipgloss.AdaptiveColor{Light: "237", Dark: "252"}
 
 	pillCapStyle = lipgloss.NewStyle().Foreground(pillBg)
 	// Padding 0,1 = one cell of bg-coloured space on each side of the tag
