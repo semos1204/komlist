@@ -9,6 +9,8 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -23,8 +25,11 @@ import (
 )
 
 var (
-	titleStyle = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
-	helpStyle  = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#6b7394", Dark: "#565f89"})
+	titleStyle  = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
+	pathStyle   = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#6b7394", Dark: "#787c99"})
+	branchStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7d8198", Dark: "#565f89"})
+
+	helpStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#6b7394", Dark: "#565f89"})
 
 	// Coloured keybind labels — the keys themselves in accent blue,
 	// surrounding action text in muted text colour.
@@ -525,7 +530,7 @@ func (m model) View() string {
 		return ""
 	}
 	var b strings.Builder
-	b.WriteString(titleStyle.Render(" komlist") + "\n\n")
+	b.WriteString(m.headerLine() + "\n\n")
 	b.WriteString(m.tabBar() + "\n\n")
 	if m.err != nil {
 		b.WriteString("  error: " + m.err.Error() + "\n\n")
@@ -664,8 +669,8 @@ func (m model) tabBar() string {
 	return spaceBetween(left, right, m.rowWidth())
 }
 
-// statsLine summarises the visible task set: total, high-priority count,
-// and tasks due within three days.
+// statsLine summarises the visible task set: current sort, total task
+// count, high-priority count, and tasks due within three days.
 func (m model) statsLine() string {
 	total := len(m.tasks)
 	high := 0
@@ -679,7 +684,64 @@ func (m model) statsLine() string {
 			due++
 		}
 	}
-	return helpStyle.Render(fmt.Sprintf("%d tasks · %d high · %d due ", total, high, due))
+	return helpStyle.Render(fmt.Sprintf("sort urgency ↓ · %d tasks · %d high · %d due ", total, high, due))
+}
+
+// headerLine renders the top chrome strip: title on the left next to the
+// shortened cwd, current git branch right-aligned. The branch resolves
+// from the nearest .git directory walking up from cwd; an isolated
+// directory just hides the branch slot.
+func (m model) headerLine() string {
+	title := titleStyle.Render(" komlist")
+	cwd, err := os.Getwd()
+	if err != nil {
+		return title
+	}
+	left := title + "  " + pathStyle.Render(shortenHomePath(cwd))
+	right := ""
+	if branch := gitBranch(cwd); branch != "" {
+		right = branchStyle.Render("⎇ "+branch) + " "
+	}
+	return spaceBetween(left, right, m.rowWidth())
+}
+
+// shortenHomePath replaces a $HOME prefix with "~" for a compact path.
+func shortenHomePath(p string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return p
+	}
+	if p == home {
+		return "~"
+	}
+	if strings.HasPrefix(p, home+string(os.PathSeparator)) {
+		return "~" + strings.TrimPrefix(p, home)
+	}
+	return p
+}
+
+// gitBranch reads HEAD from the nearest .git directory walking up from
+// dir. Returns the branch name, a short commit hash on detached HEAD, or
+// the empty string when no git repo is found.
+func gitBranch(dir string) string {
+	for {
+		head := filepath.Join(dir, ".git", "HEAD")
+		if data, err := os.ReadFile(head); err == nil {
+			s := strings.TrimSpace(string(data))
+			if rest, ok := strings.CutPrefix(s, "ref: refs/heads/"); ok {
+				return rest
+			}
+			if len(s) >= 7 {
+				return s[:7]
+			}
+			return ""
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
 }
 
 // positionFooter renders "X / Y" on the right edge so the user knows

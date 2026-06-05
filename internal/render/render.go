@@ -64,16 +64,57 @@ var (
 	FooterStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFgDim})
 
 	// Pill colours come straight from the design: blue text on a very
-	// dark blue background, not grey. The cap glyphs use the body bg as
-	// their foreground so they "round off" the body's rectangle.
-	pillBg = lipgloss.AdaptiveColor{Light: hexPillBgLight, Dark: hexPillBg}
-	pillFg = lipgloss.AdaptiveColor{Light: hexAccentLight, Dark: hexAccent}
+	// dark blue background, not grey. Additional palette entries break
+	// up the visual sameness when a board has many tags. The cap glyphs
+	// use the body bg as their foreground so they "round off" the body's
+	// rectangle.
+	tagPalettes = []tagPalette{
+		// blue (default — most tags)
+		{
+			Bg: lipgloss.AdaptiveColor{Light: hexPillBgLight, Dark: hexPillBg},
+			Fg: lipgloss.AdaptiveColor{Light: hexAccentLight, Dark: hexAccent},
+		},
+		// purple
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#ece4f5", Dark: "#231f33"},
+			Fg: lipgloss.AdaptiveColor{Light: "#5b3a99", Dark: "#bb9af7"},
+		},
+		// cyan
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#d8eef7", Dark: "#1d272f"},
+			Fg: lipgloss.AdaptiveColor{Light: "#2d6f8c", Dark: "#7dcfff"},
+		},
+		// amber
+		{
+			Bg: lipgloss.AdaptiveColor{Light: "#f5ead4", Dark: "#2a261d"},
+			Fg: lipgloss.AdaptiveColor{Light: "#8c6b1c", Dark: "#e0af68"},
+		},
+	}
 
-	pillCapStyle = lipgloss.NewStyle().Foreground(pillBg)
-	// Padding 0,1 = one cell of bg-coloured space on each side of the tag
-	// text so the rounded caps don't sit flush against the letters.
-	pillBodyStyle = lipgloss.NewStyle().Background(pillBg).Foreground(pillFg).Padding(0, 1)
+	// dimmedTagPalette tones every chip on a "done" row down to a near-
+	// invisible neutral, so completed work fades into the background.
+	dimmedTagPalette = tagPalette{
+		Bg: lipgloss.AdaptiveColor{Light: "#e4e6ef", Dark: "#1c1d2b"},
+		Fg: lipgloss.AdaptiveColor{Light: "#7d8198", Dark: hexFgDim},
+	}
 )
+
+// tagPalette pairs a pill background with its text/cap foreground.
+type tagPalette struct {
+	Bg lipgloss.AdaptiveColor
+	Fg lipgloss.AdaptiveColor
+}
+
+// paletteFor picks a stable palette entry from the tag's name via a tiny
+// hash, so the same tag always renders in the same colour. Most tags land
+// on the blue entry (index 0) thanks to the small palette size.
+func paletteFor(tag string) tagPalette {
+	var sum uint32
+	for _, b := range []byte(tag) {
+		sum = sum*31 + uint32(b)
+	}
+	return tagPalettes[sum%uint32(len(tagPalettes))]
+}
 
 // Powerline rounded caps. They require a Nerd Font in the terminal to
 // render as half-circles — without one they show up as missing-glyph
@@ -237,11 +278,12 @@ func TaskLineLeft(t task.Task, blocked bool) string {
 }
 
 // TaskLineRight returns the right-aligned half of a TUI row: tag pills,
-// recurrence marker, and due label, in that visual order. Returns the empty
-// string when none of those are set.
+// recurrence marker, and due label, in that visual order. Pills on a
+// done task render with the dimmed palette so the row reads as faded.
+// Returns the empty string when none of those are set.
 func TaskLineRight(t task.Task) string {
 	var parts []string
-	if pills := TagPills(t.Tags); pills != "" {
+	if pills := TagPills(t.Tags, t.Status == task.StatusDone); pills != "" {
 		parts = append(parts, pills)
 	}
 	if t.Recur != task.RecurNone {
@@ -253,17 +295,29 @@ func TaskLineRight(t task.Task) string {
 	return strings.Join(parts, " ")
 }
 
-// TagPills renders a list of tags as rounded soft-background chips, joined
-// by two spaces so they read as separate units.
-func TagPills(tags []string) string {
+// TagPills renders a list of tags as rounded soft-background chips,
+// joined by two spaces so they read as separate units. Pass dimmed=true
+// for the done-row variant where every chip fades into a near-invisible
+// neutral. Otherwise each tag picks a palette entry based on a stable
+// hash of its name.
+func TagPills(tags []string, dimmed bool) string {
 	if len(tags) == 0 {
 		return ""
 	}
 	out := make([]string, len(tags))
 	for i, t := range tags {
-		out[i] = pillCapStyle.Render(pillLeftCap) +
-			pillBodyStyle.Render(t) +
-			pillCapStyle.Render(pillRightCap)
+		palette := paletteFor(t)
+		if dimmed {
+			palette = dimmedTagPalette
+		}
+		capStyle := lipgloss.NewStyle().Foreground(palette.Bg)
+		bodyStyle := lipgloss.NewStyle().
+			Background(palette.Bg).
+			Foreground(palette.Fg).
+			Padding(0, 1)
+		out[i] = capStyle.Render(pillLeftCap) +
+			bodyStyle.Render(t) +
+			capStyle.Render(pillRightCap)
 	}
 	return strings.Join(out, "  ")
 }
