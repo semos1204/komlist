@@ -160,9 +160,10 @@ $ kl ui
 
 A Bubble Tea terminal app over your tasks. Charm-style minimalist
 rendering — circular status glyphs `○ ◐ ⊘ ●` showing the lifecycle from
-empty to full, a thin accent bar `▎` marking the row under the cursor (no
-heavy full-width highlight), a single colour-coded letter for priority and
-a short flag-and-month due date. Navigate with arrow keys (or `j`/`k`).
+empty to full, a vertical accent bar `▎` plus a subtle background tint
+marking the row under the cursor, a single colour-coded letter for
+priority and a short flag-and-month due date. Navigate with arrow keys
+(or `j`/`k`).
 
 | Key | Action |
 |---|---|

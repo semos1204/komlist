@@ -26,13 +26,22 @@ var (
 	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(render.Accent)
 	helpStyle      = lipgloss.NewStyle().Faint(true)
 	cursorBarStyle = lipgloss.NewStyle().Foreground(render.Accent)
+
+	// selectedRowStyle gives the cursor row a subtle full-width background
+	// tint. The vertical accent bar marks the row; the tint completes the
+	// "here you are" signal without overpowering the row's content.
+	selectedRowStyle = lipgloss.NewStyle().
+				Background(lipgloss.AdaptiveColor{Light: "254", Dark: "236"})
 )
 
 const (
 	// cursorBar is the accent vertical bar that marks the row under the
-	// cursor. It is one column wide so a non-cursor row indented with two
-	// spaces aligns with "▎ ".
+	// cursor. One column wide so the row's content stays aligned with
+	// non-cursor rows indented by two spaces.
 	cursorBar = "▎"
+	// defaultRowWidth is the selection-bar width used before the first
+	// WindowSizeMsg arrives. Replaced once the real terminal width is known.
+	defaultRowWidth = 60
 	// inputRightMargin keeps the textinput field a few columns away from the
 	// right edge so the caret never touches the border.
 	inputRightMargin = 10
@@ -527,11 +536,14 @@ func (m model) renderTasks() string {
 				prev = bucket
 			}
 		}
-		prefix := "  "
 		if i == m.cursor {
-			prefix = cursorBarStyle.Render(cursorBar) + " "
+			bar := cursorBarStyle.Render(cursorBar)
+			tint := selectedRowStyle.Width(m.rowWidth() - 1).
+				Render(" " + render.TaskLinePlain(t, m.blocked[t.ID]))
+			b.WriteString(bar + tint + "\n")
+		} else {
+			b.WriteString("  " + render.TaskLine(t, m.blocked[t.ID]) + "\n")
 		}
-		b.WriteString(prefix + render.TaskLine(t, m.blocked[t.ID]) + "\n")
 	}
 	return b.String()
 }
@@ -572,6 +584,15 @@ func (m model) bottomBar() string {
 		line2 := " g group · s status · f tag · c clear · r reload · q quit"
 		return helpStyle.Render(line1) + "\n" + helpStyle.Render(line2)
 	}
+}
+
+// rowWidth returns the width used to pad the selection bar to full-width,
+// falling back to defaultRowWidth before the first WindowSizeMsg arrives.
+func (m model) rowWidth() int {
+	if m.width > 0 {
+		return m.width
+	}
+	return defaultRowWidth
 }
 
 func reorderByFirstTag(tasks []task.Task) []task.Task {

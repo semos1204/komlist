@@ -138,3 +138,25 @@ func TaskLine(t task.Task, blocked bool) string {
 	}
 	return strings.Join(parts, " ")
 }
+
+// TaskLinePlain renders the same content as TaskLine but with no embedded
+// styling, so callers can wrap the whole line in a single style (typically
+// the selection background bar in the TUI). The leading bullet and ID still
+// keep their respective widths, just without colour.
+func TaskLinePlain(t task.Task, blocked bool) string {
+	parts := []string{statusGlyph[t.Status], fmt.Sprintf("%3d", t.ID)}
+	if blocked {
+		parts = append(parts, "\U0001F512")
+	}
+	parts = append(parts, t.Title)
+	if letter, ok := priorityLetter[t.Priority]; ok {
+		parts = append(parts, letter)
+	}
+	if t.DueAt != nil {
+		parts = append(parts, "⚐ "+t.DueAt.Format("Jan 02"))
+	}
+	if t.Recur != task.RecurNone {
+		parts = append(parts, "⟳ "+string(t.Recur))
+	}
+	return strings.Join(parts, " ")
+}
