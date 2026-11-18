@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/semos1204/komlist/internal/boardcfg"
 	"github.com/semos1204/komlist/internal/cli"
 	"github.com/semos1204/komlist/internal/clock"
 	"github.com/semos1204/komlist/internal/i18n"
@@ -50,6 +51,8 @@ func localizeError(err error) string {
 		return i18n.T(i18n.KeyErrSelfDependency)
 	case errors.Is(err, service.ErrDependencyCycle):
 		return i18n.T(i18n.KeyErrDependencyCycle)
+	case errors.Is(err, boardcfg.ErrEmptyTitle):
+		return i18n.T(i18n.KeyErrEmptyColTitle)
 	default:
 		return err.Error()
 	}
@@ -69,7 +72,7 @@ func run() error {
 	defer func() { _ = closer.Close() }()
 
 	svc := service.New(repo, clock.System{})
-	root := cli.NewRootCommand(svc)
+	root := cli.NewRootCommand(svc, boardcfg.NewFile(filepath.Join(dir, "columns.json")))
 	root.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, date)
 	return root.ExecuteContext(context.Background())
 }

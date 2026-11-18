@@ -83,7 +83,7 @@ func Board(cols []Column, blocked map[int]bool, width, height int, now time.Time
 // limit lines (0 = no limit), closing with "… +N more" when some are cut.
 func columnBody(c Column, blocked map[int]bool, inner, limit int, now time.Time) string {
 	lines := []string{
-		columnTitleStyle.Width(inner).Render(fmt.Sprintf("%s (%d)", c.Title, len(c.Tasks))),
+		columnTitleStyle.Width(inner).Render(columnHeader(c.Title, len(c.Tasks), inner)),
 		ruleStyle.Render(strings.Repeat("─", inner)),
 	}
 	sep := ruleStyle.Render(strings.Repeat("-", inner))
@@ -105,6 +105,17 @@ func columnBody(c Column, blocked map[int]bool, inner, limit int, now time.Time)
 		used += need
 	}
 	return strings.Join(lines, "\n")
+}
+
+// columnHeader renders "Title (n)" on one line of at most width cells,
+// cutting the title (never the count) with "…" so a long custom title
+// cannot wrap and push the column out of line with its neighbours.
+func columnHeader(title string, n, width int) string {
+	count := fmt.Sprintf(" (%d)", n)
+	if lipgloss.Width(title)+lipgloss.Width(count) > width {
+		title = ansi.Truncate(title, max(width-lipgloss.Width(count)-1, 1), "") + "…"
+	}
+	return title + count
 }
 
 // Card renders one task as a block exactly width cells wide, topydo-style:

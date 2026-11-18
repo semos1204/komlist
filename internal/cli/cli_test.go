@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/semos1204/komlist/internal/boardcfg"
 	"github.com/semos1204/komlist/internal/cli"
 	"github.com/semos1204/komlist/internal/clock"
 	"github.com/semos1204/komlist/internal/i18n"
@@ -41,8 +42,9 @@ func newCLI(t *testing.T) (
 	t.Helper()
 	fake = clock.NewFake(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
 	svc = service.New(storage.NewMemory(), fake)
+	titles := boardcfg.NewMemory()
 	run = func(args ...string) (string, string, error) {
-		root := cli.NewRootCommand(svc)
+		root := cli.NewRootCommand(svc, titles)
 		var out, errb bytes.Buffer
 		root.SetOut(&out)
 		root.SetErr(&errb)

@@ -5,18 +5,19 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/boardcfg"
 	"github.com/semos1204/komlist/internal/service"
 )
 
 // NewRootCommand returns the root komlist command with all sub-commands
-// attached.
+// attached. titles holds the custom board column titles.
 //
 // Error UX: usage is printed on argument-validation errors (the user typed
 // the command wrong) but suppressed on runtime errors raised from RunE
 // (e.g. "task not found") — those are shown as plain one-liners by main.
 // This is achieved by flipping SilenceUsage to true from PersistentPreRunE,
 // which runs only after argument validation has passed.
-func NewRootCommand(svc *service.TaskService) *cobra.Command {
+func NewRootCommand(svc *service.TaskService, titles boardcfg.Store) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "kl",
 		Short:         "A small command-line task manager (komlist)",
@@ -30,7 +31,8 @@ func NewRootCommand(svc *service.TaskService) *cobra.Command {
 	root.AddCommand(
 		NewAddCommand(svc),
 		NewListCommand(svc),
-		NewBoardCommand(svc),
+		NewBoardCommand(svc, titles),
+		NewColumnsCommand(svc, titles),
 		NewUICommand(svc),
 		NewShowCommand(svc),
 		NewStatusCommand(svc),

@@ -226,6 +226,22 @@ $ kl board --status todo # only pending items
  +1 tags not shown: travail (kl board <tag>)
 ```
 
+#### Renaming columns
+
+Like a sprint dashboard, every board column can get its own title. A
+column is named by a key: `all`, `today`, `overdue`, or `+<tag>` for a tag
+column. Titles are stored in `~/.komlist/columns.json`, apart from the
+tasks — renaming a column never touches a task, and `kl tags rename` is
+still the way to rename the tag itself.
+
+```console
+$ kl columns                              # every column and its current title
+$ kl columns rename all "Backlog"
+$ kl columns rename today "Sprint en cours"
+$ kl columns rename +finops "FinOps"
+$ kl columns reset all                    # back to "All tasks"
+```
+
 Colors are disabled automatically when output is piped or `NO_COLOR` is set.
 
 ### Errors

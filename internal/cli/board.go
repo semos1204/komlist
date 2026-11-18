@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
+	"github.com/semos1204/komlist/internal/boardcfg"
 	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/render"
 	"github.com/semos1204/komlist/internal/service"
@@ -23,7 +24,7 @@ import (
 // bordered columns (all tasks, due today, overdue, then the busiest tags),
 // each ordered by urgency and sized to fit the terminal. A positional
 // tag argument shows only that board; --status filters by status.
-func NewBoardCommand(svc *service.TaskService) *cobra.Command {
+func NewBoardCommand(svc *service.TaskService, titles boardcfg.Store) *cobra.Command {
 	var statusFlag string
 	cmd := &cobra.Command{
 		Use:   "board [tag]",
@@ -49,7 +50,11 @@ func NewBoardCommand(svc *service.TaskService) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			renderBoard(cmd.OutOrStdout(), tasks, blocked, filter.Tag)
+			t, err := titles.Load()
+			if err != nil {
+				return err
+			}
+			renderBoard(cmd.OutOrStdout(), tasks, blocked, filter.Tag, t)
 			return nil
 		},
 	}
@@ -58,14 +63,14 @@ func NewBoardCommand(svc *service.TaskService) *cobra.Command {
 	return cmd
 }
 
-func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool, tagFilter string) {
+func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool, tagFilter string, titles boardcfg.Titles) {
 	if len(tasks) == 0 {
 		fmt.Fprintln(w, i18n.T(i18n.KeyNoTasks))
 		return
 	}
 	now := time.Now()
 	width, height := terminalSize(w)
-	cols, hidden := boardColumns(tasks, tagFilter, width/render.MinColumnWidth, now)
+	cols, hidden := boardColumns(tasks, tagFilter, width/render.MinColumnWidth, now, titles)
 
 	footer := []string{renderStats(tasks)}
 	if len(hidden) > 0 {
@@ -86,8 +91,9 @@ func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool, tagFilter
 // columns as fit beside the first three in slots columns, busiest tags
 // first. The names of the tags left out are returned so the footer can
 // list them. When the board is filtered on a tag, the first column carries
-// that tag's name and there are no tag columns.
-func boardColumns(tasks []task.Task, tagFilter string, slots int, now time.Time) ([]render.Column, []string) {
+// that tag's name and there are no tag columns. Custom titles set with
+// "kl columns rename" replace the defaults.
+func boardColumns(tasks []task.Task, tagFilter string, slots int, now time.Time, titles boardcfg.Titles) ([]render.Column, []string) {
 	var dueToday, overdue []task.Task
 	for _, t := range tasks {
 		if t.DueAt == nil || t.Status == task.StatusDone {
@@ -100,14 +106,14 @@ func boardColumns(tasks []task.Task, tagFilter string, slots int, now time.Time)
 			dueToday = append(dueToday, t)
 		}
 	}
-	first := i18n.T(i18n.KeyBoardAll)
+	first := titles.Title(boardcfg.KeyAll, i18n.T(i18n.KeyBoardAll))
 	if tagFilter != "" {
-		first = tagFilter
+		first = titles.Title(boardcfg.TagKey(tagFilter), tagFilter)
 	}
 	cols := []render.Column{
 		{Title: first, Tasks: tasks},
-		{Title: i18n.T(i18n.KeyBoardDueToday), Tasks: dueToday},
-		{Title: i18n.T(i18n.KeyBoardOverdue), Tasks: overdue},
+		{Title: titles.Title(boardcfg.KeyToday, i18n.T(i18n.KeyBoardDueToday)), Tasks: dueToday},
+		{Title: titles.Title(boardcfg.KeyOverdue, i18n.T(i18n.KeyBoardOverdue)), Tasks: overdue},
 	}
 	if tagFilter != "" {
 		return cols, nil
@@ -117,7 +123,7 @@ func boardColumns(tasks []task.Task, tagFilter string, slots int, now time.Time)
 	sort.SliceStable(names, func(i, j int) bool { return len(groups[names[i]]) > len(groups[names[j]]) })
 	shown := min(max(slots-len(cols), 0), len(names))
 	for _, name := range names[:shown] {
-		cols = append(cols, render.Column{Title: name, Tasks: groups[name]})
+		cols = append(cols, render.Column{Title: titles.Title(boardcfg.TagKey(name), name), Tasks: groups[name]})
 	}
 	return cols, names[shown:]
 }

@@ -51,11 +51,17 @@ const (
 	KeyBoardOverdue  Key = "board_overdue"
 	KeyBoardMore     Key = "board_more"
 	KeyBoardHidden   Key = "board_hidden_tags"
-	KeyDueToday      Key = "due_today"
-	KeyDueTomorrow   Key = "due_tomorrow"
-	KeyDueYesterday  Key = "due_yesterday"
-	KeyDueInDays     Key = "due_in_days"
-	KeyDueDaysAgo    Key = "due_days_ago"
+
+	// Column titles management ("kl columns").
+	KeyColColumn        Key = "col_column"
+	KeyColumnRenamed    Key = "column_renamed"
+	KeyColumnReset      Key = "column_reset"
+	KeyErrEmptyColTitle Key = "err_empty_column_title"
+	KeyDueToday         Key = "due_today"
+	KeyDueTomorrow      Key = "due_tomorrow"
+	KeyDueYesterday     Key = "due_yesterday"
+	KeyDueInDays        Key = "due_in_days"
+	KeyDueDaysAgo       Key = "due_days_ago"
 
 	// Column / field labels.
 	KeyColID         Key = "col_id"
@@ -121,6 +127,10 @@ var catalog = map[string]map[Key]string{
 		KeyBoardOverdue:       "Overdue tasks",
 		KeyBoardMore:          "… +%d more",
 		KeyBoardHidden:        "+%d tags not shown: %s (kl board <tag>)",
+		KeyColColumn:          "COLUMN",
+		KeyColumnRenamed:      "Column %s renamed: %s",
+		KeyColumnReset:        "Column %s: default title restored",
+		KeyErrEmptyColTitle:   "column title must not be empty",
 		KeyDueToday:           "due today",
 		KeyDueTomorrow:        "due tomorrow",
 		KeyDueYesterday:       "due yesterday",
@@ -185,6 +195,10 @@ var catalog = map[string]map[Key]string{
 		KeyBoardOverdue:       "En retard",
 		KeyBoardMore:          "… +%d autres",
 		KeyBoardHidden:        "+%d étiquettes non affichées : %s (kl board <tag>)",
+		KeyColColumn:          "COLONNE",
+		KeyColumnRenamed:      "Colonne %s renommée : %s",
+		KeyColumnReset:        "Colonne %s : titre par défaut rétabli",
+		KeyErrEmptyColTitle:   "le titre de colonne ne peut pas être vide",
 		KeyDueToday:           "échéance aujourd'hui",
 		KeyDueTomorrow:        "échéance demain",
 		KeyDueYesterday:       "échéance hier",

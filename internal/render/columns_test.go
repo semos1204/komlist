@@ -111,3 +111,13 @@ func TestDueLabel(t *testing.T) {
 		}
 	}
 }
+
+func TestColumnHeader_CutsLongTitleKeepsCount(t *testing.T) {
+	got := columnHeader("Un titre de colonne beaucoup trop long", 12, 24)
+	if w := lipgloss.Width(got); w > 24 {
+		t.Errorf("header %q is %d cells, want at most 24", got, w)
+	}
+	if !strings.HasSuffix(got, "… (12)") {
+		t.Errorf("header %q should keep the count after the ellipsis", got)
+	}
+}
