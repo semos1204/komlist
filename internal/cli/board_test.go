@@ -1,6 +1,7 @@
 package cli_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -78,5 +79,25 @@ func TestCLI_BoardDueColumns(t *testing.T) {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("board output missing %q:\n%s", want, stdout)
 		}
+	}
+}
+
+func TestCLI_BoardHiddenTags(t *testing.T) {
+	lipgloss.SetColorProfile(termenv.Ascii)
+	_, _, run := newCLI(t)
+	t.Setenv("COLUMNS", "104") // 4 slots of 26: the 3 fixed columns + 1 tag
+	for i, tag := range []string{"busy", "busy", "rare"} {
+		run("add", "task")
+		run("tag", fmt.Sprint(i+1), tag)
+	}
+	stdout, _, err := run("board")
+	if err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	if !strings.Contains(stdout, "busy (2)") {
+		t.Errorf("the busiest tag should get the free column:\n%s", stdout)
+	}
+	if strings.Contains(stdout, "rare (1)") || !strings.Contains(stdout, "+1 tags not shown: rare") {
+		t.Errorf("the tag that does not fit should be listed in the footer:\n%s", stdout)
 	}
 }

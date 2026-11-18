@@ -49,6 +49,8 @@ const (
 	KeyBoardAll      Key = "board_all"
 	KeyBoardDueToday Key = "board_due_today"
 	KeyBoardOverdue  Key = "board_overdue"
+	KeyBoardMore     Key = "board_more"
+	KeyBoardHidden   Key = "board_hidden_tags"
 	KeyDueToday      Key = "due_today"
 	KeyDueTomorrow   Key = "due_tomorrow"
 	KeyDueYesterday  Key = "due_yesterday"
@@ -117,6 +119,8 @@ var catalog = map[string]map[Key]string{
 		KeyBoardAll:           "All tasks",
 		KeyBoardDueToday:      "Due today",
 		KeyBoardOverdue:       "Overdue tasks",
+		KeyBoardMore:          "… +%d more",
+		KeyBoardHidden:        "+%d tags not shown: %s (kl board <tag>)",
 		KeyDueToday:           "due today",
 		KeyDueTomorrow:        "due tomorrow",
 		KeyDueYesterday:       "due yesterday",
@@ -179,6 +183,8 @@ var catalog = map[string]map[Key]string{
 		KeyBoardAll:           "Toutes les tâches",
 		KeyBoardDueToday:      "Pour aujourd'hui",
 		KeyBoardOverdue:       "En retard",
+		KeyBoardMore:          "… +%d autres",
+		KeyBoardHidden:        "+%d étiquettes non affichées : %s (kl board <tag>)",
 		KeyDueToday:           "échéance aujourd'hui",
 		KeyDueTomorrow:        "échéance demain",
 		KeyDueYesterday:       "échéance hier",

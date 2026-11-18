@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
 	"github.com/spf13/cobra"
 
@@ -19,14 +20,14 @@ import (
 )
 
 // NewBoardCommand returns "kl board [tag]", a colored, topydo-style view of
-// bordered columns (all tasks, due today, overdue, one per tag), each
-// ordered by urgency. A positional
+// bordered columns (all tasks, due today, overdue, then the busiest tags),
+// each ordered by urgency and sized to fit the terminal. A positional
 // tag argument shows only that board; --status filters by status.
 func NewBoardCommand(svc *service.TaskService) *cobra.Command {
 	var statusFlag string
 	cmd := &cobra.Command{
 		Use:   "board [tag]",
-		Short: "Show tasks as columns: all, due today, overdue, one per tag",
+		Short: "Show tasks as columns: all, due today, overdue, then tags, sized to the screen",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			filter := service.ListFilter{Sort: service.SortByUrgency}
@@ -63,15 +64,30 @@ func renderBoard(w io.Writer, tasks []task.Task, blocked map[int]bool, tagFilter
 		return
 	}
 	now := time.Now()
-	fmt.Fprintln(w, render.Board(boardColumns(tasks, tagFilter, now), blocked, terminalWidth(w), now))
-	fmt.Fprintln(w, renderStats(tasks))
+	width, height := terminalSize(w)
+	cols, hidden := boardColumns(tasks, tagFilter, width/render.MinColumnWidth, now)
+
+	footer := []string{renderStats(tasks)}
+	if len(hidden) > 0 {
+		footer = append(footer, render.FooterStyle.Render(" "+ansi.Truncate(
+			i18n.T(i18n.KeyBoardHidden, len(hidden), strings.Join(hidden, ", ")), width-1, "…")))
+	}
+	if height > 0 {
+		height -= len(footer) + 1 // keep the footer and the shell prompt on screen
+	}
+	fmt.Fprintln(w, render.Board(cols, blocked, width, height, now))
+	for _, l := range footer {
+		fmt.Fprintln(w, l)
+	}
 }
 
-// boardColumns builds the topydo-style column set: every task, then the
-// open tasks due today and overdue, then one column per tag. When the board
-// is already filtered on a tag, the first column carries that tag's name
-// and the per-tag columns are dropped as redundant.
-func boardColumns(tasks []task.Task, tagFilter string, now time.Time) []render.Column {
+// boardColumns builds the topydo-style column set: all tasks, open tasks
+// due today, open tasks overdue, then one column per tag — only as many tag
+// columns as fit beside the first three in slots columns, busiest tags
+// first. The names of the tags left out are returned so the footer can
+// list them. When the board is filtered on a tag, the first column carries
+// that tag's name and there are no tag columns.
+func boardColumns(tasks []task.Task, tagFilter string, slots int, now time.Time) ([]render.Column, []string) {
 	var dueToday, overdue []task.Task
 	for _, t := range tasks {
 		if t.DueAt == nil || t.Status == task.StatusDone {
@@ -94,27 +110,35 @@ func boardColumns(tasks []task.Task, tagFilter string, now time.Time) []render.C
 		{Title: i18n.T(i18n.KeyBoardOverdue), Tasks: overdue},
 	}
 	if tagFilter != "" {
-		return cols
+		return cols, nil
 	}
 	groups := groupByTag(tasks)
-	for _, name := range sortedGroupNames(groups) {
+	names := sortedGroupNames(groups)
+	sort.SliceStable(names, func(i, j int) bool { return len(groups[names[i]]) > len(groups[names[j]]) })
+	shown := min(max(slots-len(cols), 0), len(names))
+	for _, name := range names[:shown] {
 		cols = append(cols, render.Column{Title: name, Tasks: groups[name]})
 	}
-	return cols
+	return cols, names[shown:]
 }
 
-// terminalWidth returns the width of w when it is a terminal, else
-// $COLUMNS, else a 120-cell default (pipes, tests).
-func terminalWidth(w io.Writer) int {
+// terminalSize returns the size of w when it is a terminal, else $COLUMNS
+// and $LINES. Width falls back to 120; height falls back to 0 (unlimited),
+// so piped output is never cut.
+func terminalSize(w io.Writer) (width, height int) {
 	if f, ok := w.(*os.File); ok {
-		if width, _, err := term.GetSize(f.Fd()); err == nil && width > 0 {
-			return width
+		if cw, ch, err := term.GetSize(f.Fd()); err == nil && cw > 0 {
+			return cw, ch
 		}
 	}
+	width = 120
 	if c, err := strconv.Atoi(os.Getenv("COLUMNS")); err == nil && c > 0 {
-		return c
+		width = c
 	}
-	return 120
+	if l, err := strconv.Atoi(os.Getenv("LINES")); err == nil && l > 0 {
+		height = l
+	}
+	return width, height
 }
 
 // groupByTag buckets tasks by tag, preserving the incoming (urgency-sorted)

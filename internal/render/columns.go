@@ -6,15 +6,20 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/semos1204/komlist/internal/i18n"
 	"github.com/semos1204/komlist/internal/task"
 )
 
 // MinColumnWidth is the narrowest outer width (borders included) a board
-// column may take. When the terminal cannot fit every column side by side
-// at this width, the board wraps onto additional rows of columns.
-const MinColumnWidth = 32
+// column may take. Callers use it to decide how many columns fit side by
+// side; Board itself wraps onto extra rows when given more than that.
+const MinColumnWidth = 26
+
+// maxTitleLines caps how many lines a card title may wrap onto; longer
+// titles end with an ellipsis.
+const maxTitleLines = 2
 
 // Column is one titled box of the board view.
 type Column struct {
@@ -26,107 +31,165 @@ var (
 	columnBorder = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
 			BorderForeground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFgDimmer})
-	columnTitleStyle = lipgloss.NewStyle().Bold(true).Align(lipgloss.Center).
+	columnTitleStyle = lipgloss.NewStyle().Align(lipgloss.Center).
 				Foreground(lipgloss.AdaptiveColor{Light: hexFgLight, Dark: hexFg})
 	ruleStyle = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: hexFgDimLight, Dark: hexFgDimmer})
 )
 
 // Board renders columns as bordered boxes laid out side by side within
-// width terminal cells, topydo-style. Each task is a card: a coloured
-// urgency bar, its id and status glyph, then title, tags and due label
-// wrapped inside the column. Boxes in the same row share the same height.
-func Board(cols []Column, blocked map[int]bool, width int, now time.Time) string {
+// width terminal cells, topydo-style. Each task is a card — coloured
+// urgency bar, id, status glyph, priority, title, +tags, due label — and
+// cards are separated by a dashed rule.
+//
+// height is the number of terminal lines the whole board may use (0 means
+// unlimited, e.g. when piped). When a column holds more cards than fit, it
+// ends with "… +N more" instead of growing past the screen.
+func Board(cols []Column, blocked map[int]bool, width, height int, now time.Time) string {
 	if len(cols) == 0 {
 		return ""
 	}
-	if width < MinColumnWidth {
-		width = MinColumnWidth
-	}
+	width = max(width, MinColumnWidth)
 	perRow := min(max(width/MinColumnWidth, 1), len(cols))
 	inner := width/perRow - 2 // the border takes one cell on each side
+	nRows := (len(cols) + perRow - 1) / perRow
+
+	// Lines available for cards in each box: the row's share of the
+	// height, minus the border (2) and the title + rule (2).
+	limit := 0
+	if height > 0 {
+		limit = max(height/nRows-4, 1)
+	}
 
 	var rows []string
 	for start := 0; start < len(cols); start += perRow {
 		end := min(start+perRow, len(cols))
 		bodies := make([]string, 0, end-start)
-		height := 0
+		boxH := 0
 		for _, c := range cols[start:end] {
-			b := columnBody(c, blocked, inner, now)
+			b := columnBody(c, blocked, inner, limit, now)
 			bodies = append(bodies, b)
-			height = max(height, lipgloss.Height(b))
+			boxH = max(boxH, lipgloss.Height(b))
 		}
 		boxes := make([]string, len(bodies))
 		for i, b := range bodies {
-			boxes[i] = columnBorder.Width(inner).Height(height).Render(b)
+			boxes[i] = columnBorder.Width(inner).Height(boxH).Render(b)
 		}
 		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, boxes...))
 	}
 	return strings.Join(rows, "\n")
 }
 
-func columnBody(c Column, blocked map[int]bool, inner int, now time.Time) string {
+// columnBody renders the title, the rule and as many cards as fit in
+// limit lines (0 = no limit), closing with "… +N more" when some are cut.
+func columnBody(c Column, blocked map[int]bool, inner, limit int, now time.Time) string {
 	lines := []string{
 		columnTitleStyle.Width(inner).Render(fmt.Sprintf("%s (%d)", c.Title, len(c.Tasks))),
 		ruleStyle.Render(strings.Repeat("─", inner)),
 	}
-	sep := ruleStyle.Render(strings.Repeat("╌", inner))
-	for _, t := range c.Tasks {
-		lines = append(lines, Card(t, blocked[t.ID], inner, now), sep)
+	sep := ruleStyle.Render(strings.Repeat("-", inner))
+	used := 0
+	for i, t := range c.Tasks {
+		card := Card(t, blocked[t.ID], inner, now)
+		need := lipgloss.Height(card) + 1 // card + its dashed rule
+		reserve := 0
+		if i < len(c.Tasks)-1 {
+			reserve = 1 // keep room for the "… +N more" line
+		}
+		if limit > 0 && used+need+reserve > limit {
+			more := FooterStyle.Width(inner).Align(lipgloss.Right).
+				Render(i18n.T(i18n.KeyBoardMore, len(c.Tasks)-i))
+			lines = append(lines, more)
+			break
+		}
+		lines = append(lines, card, sep)
+		used += need
 	}
 	return strings.Join(lines, "\n")
 }
 
-// Card renders one task as a multi-line block exactly width cells wide.
+// Card renders one task as a block exactly width cells wide, topydo-style:
 //
-//	▌  26 ○ (H) Title wrapped onto
-//	▌         several lines
-//	▌         +infra +prod
-//	▌         due in 2 days
+//	▌  25 ○ (H) Fixer alerte CloudWatch
+//	▌         RDS EU Writer CPU (action…
+//	▌         +qq +infra
+//	▌         due 166 days ago
+//
+// The title wraps onto two lines at most, tags fit on one line; both end
+// with "…" when cut.
 func Card(t task.Task, blocked bool, width int, now time.Time) string {
-	done := t.Status == task.StatusDone
-
 	prefix := ID(t.ID) + " " + Bullet(t.Status) + " "
-	prefixW := lipgloss.Width(prefix)
-	bodyW := max(width-3-prefixW, 8) // bar + gap on the left, one cell of margin on the right
-	wrap := lipgloss.NewStyle().Width(bodyW)
+	bodyW := max(width-3-lipgloss.Width(prefix), 8) // bar + gap on the left, one cell of margin on the right
 
-	head := []string{}
-	if blocked {
-		head = append(head, "\U0001F512")
-	}
-	if t.Priority != "" {
-		head = append(head, lipgloss.NewStyle().Bold(true).Foreground(PriorityColor(t.Priority)).
-			Render("("+strings.ToUpper(string(t.Priority)[:1])+")"))
-	}
-	title := t.Title
-	if done {
-		title = DoneStyle.Render(title)
-	}
-	head = append(head, title)
-
-	body := []string{wrap.Render(strings.Join(head, " "))}
-	if len(t.Tags) > 0 {
-		tags := make([]string, len(t.Tags))
-		for i, tag := range t.Tags {
-			fg := paletteFor(tag).Fg
-			if done {
-				fg = dimmedTagPalette.Fg
-			}
-			tags[i] = lipgloss.NewStyle().Foreground(fg).Render("+" + tag)
-		}
-		body = append(body, wrap.Render(strings.Join(tags, " ")))
+	body := titleLines(t, blocked, bodyW)
+	if tags := tagLine(t, bodyW); tags != "" {
+		body = append(body, tags)
 	}
 	if t.DueAt != nil {
-		body = append(body, wrap.Render(dueStyle(now, *t.DueAt, done).Render(DueLabel(now, *t.DueAt))))
+		done := t.Status == task.StatusDone
+		body = append(body, dueStyle(now, *t.DueAt, done).Render(ansi.Truncate(DueLabel(now, *t.DueAt), bodyW, "…")))
 	}
 	if t.Recur != task.RecurNone {
 		body = append(body, Recur(t.Recur))
 	}
-	block := lipgloss.JoinVertical(lipgloss.Left, body...)
+	block := strings.Join(body, "\n")
 
 	bar := lipgloss.NewStyle().Foreground(barColor(t, now)).Render("▌")
-	barCol := strings.TrimSuffix(strings.Repeat(bar+"\n", lipgloss.Height(block)), "\n")
+	barCol := strings.TrimSuffix(strings.Repeat(bar+"\n", len(body)), "\n")
 	return lipgloss.JoinHorizontal(lipgloss.Top, barCol, " ", prefix, block)
+}
+
+// titleLines wraps the plain title (with its lock and priority marker) to
+// width, keeps maxTitleLines lines, then applies the styling — wrapping
+// the plain text first keeps the ellipsis maths free of escape codes.
+func titleLines(t task.Task, blocked bool, width int) []string {
+	var marker string
+	if t.Priority != "" {
+		marker = "(" + strings.ToUpper(string(t.Priority)[:1]) + ")"
+	}
+	head := t.Title
+	if marker != "" {
+		head = marker + " " + head
+	}
+	if blocked {
+		head = "\U0001F512 " + head
+	}
+	lines := strings.Split(ansi.Wrap(head, width, ""), "\n")
+	if len(lines) > maxTitleLines {
+		lines = lines[:maxTitleLines]
+		last := strings.TrimRight(lines[maxTitleLines-1], " ")
+		lines[maxTitleLines-1] = ansi.Truncate(last, width-1, "") + "…"
+	}
+	for i, l := range lines {
+		l = strings.TrimRight(l, " ")
+		if t.Status == task.StatusDone {
+			l = DoneStyle.Render(l)
+		} else if i == 0 && marker != "" {
+			styled := lipgloss.NewStyle().Bold(true).Foreground(PriorityColor(t.Priority)).Render(marker)
+			l = strings.Replace(l, marker, styled, 1)
+		}
+		lines[i] = l
+	}
+	return lines
+}
+
+// tagLine renders +tags on one line of at most width cells, cut with "…".
+func tagLine(t task.Task, width int) string {
+	if len(t.Tags) == 0 {
+		return ""
+	}
+	parts := make([]string, len(t.Tags))
+	for i, tag := range t.Tags {
+		fg := paletteFor(tag).Fg
+		if t.Status == task.StatusDone {
+			fg = dimmedTagPalette.Fg
+		}
+		parts[i] = lipgloss.NewStyle().Foreground(fg).Render("+" + tag)
+	}
+	line := strings.Join(parts, " ")
+	if lipgloss.Width(line) > width {
+		line = ansi.Truncate(line, width-1, "") + FooterStyle.Render("…")
+	}
+	return line
 }
 
 // DueLabel renders a due date as a sentence relative to now: "due today",
@@ -153,14 +216,13 @@ func IsOverdue(now, due time.Time) bool { return daysBetween(now, due) < 0 }
 func IsDueToday(now, due time.Time) bool { return daysBetween(now, due) == 0 }
 
 func dueStyle(now, due time.Time, done bool) lipgloss.Style {
-	s := lipgloss.NewStyle()
 	switch d := daysBetween(now, due); {
 	case done:
 		return FooterStyle
 	case d <= 0:
-		return s.Foreground(lipgloss.Color(hexPink))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(hexPink))
 	case d < 3:
-		return s.Foreground(lipgloss.Color(hexAmber))
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(hexAmber))
 	default:
 		return FooterStyle
 	}

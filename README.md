@@ -191,32 +191,39 @@ cycle covers the keyword cadences.
 ### Board view
 
 `kl board` is a colored, topydo-style view of bordered columns: all
-tasks, open tasks due today, overdue tasks, then one column per tag. Each
-column is ordered by urgency, each task is a card with an urgency bar
-(red overdue, amber due within three days, green otherwise). Columns
-wrap onto extra rows when the terminal is too narrow (width taken from
-the terminal, else `$COLUMNS`, else 120). `kl list` stays the plain,
-scriptable table.
+tasks, open tasks due today, overdue tasks, then one column per tag,
+busiest tags first. Each column is ordered by urgency; each task is a card
+— title (cut with `…` after two lines), `+tags`, due label — with an
+urgency bar (red overdue, amber due within three days, green otherwise).
+
+The board is sized to the terminal: only the tag columns that fit in the
+width are shown (the others are listed under the board, open them with
+`kl board <tag>`), and a column taller than the screen ends with
+`… +N more`. Width and height come from the terminal, else `$COLUMNS` /
+`$LINES`; when piped with no `$LINES`, nothing is cut. `kl list` stays the
+plain, scriptable table.
 
 ```console
-$ kl board               # all columns
-$ kl board travail       # travail, due today, overdue — travail tasks only
+$ kl board               # all, due today, overdue, then the busiest tags
+$ kl board travail       # same columns, travail tasks only
 $ kl board --status todo # only pending items
 ```
 
 ```
-┌──────────────────────────────┐┌──────────────────────────────┐┌──────────────────────────────┐
-│        All tasks (2)         ││        Due today (1)         ││      Overdue tasks (0)       │
-│──────────────────────────────││──────────────────────────────││──────────────────────────────│
-│▌   1 ○ (H) clean bdd 30j     ││▌   1 ○ (H) clean bdd 30j     ││                              │
-│▌       +travail              ││▌       +travail              ││                              │
-│▌       due today             ││▌       due today             ││                              │
-│╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││                              │
-│▌   2 ◉ migrate API           ││                              ││                              │
-│▌       +travail              ││                              ││                              │
-│╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││                              ││                              │
-└──────────────────────────────┘└──────────────────────────────┘└──────────────────────────────┘
+┌────────────────────────┐┌────────────────────────┐┌────────────────────────┐
+│     All tasks (2)      ││     Due today (0)      ││   Overdue tasks (1)    │
+│────────────────────────││────────────────────────││────────────────────────│
+│▌   1 ○ (H) clean bdd   ││                        ││▌   1 ○ (H) clean bdd   │
+│▌       30j             ││                        ││▌       30j             │
+│▌       +travail        ││                        ││▌       +travail        │
+│▌       due 2 days ago  ││                        ││▌       due 2 days ago  │
+│------------------------││                        ││------------------------│
+│▌   2 ◉ migrate API     ││                        ││                        │
+│▌       +travail        ││                        ││                        │
+│------------------------││                        ││                        │
+└────────────────────────┘└────────────────────────┘└────────────────────────┘
  0 done · 1 doing · 1 todo — 0% complete
+ +1 tags not shown: travail (kl board <tag>)
 ```
 
 Colors are disabled automatically when output is piped or `NO_COLOR` is set.
