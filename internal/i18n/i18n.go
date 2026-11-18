@@ -45,6 +45,16 @@ const (
 	KeyStatTodo     Key = "stat_todo"
 	KeyStatComplete Key = "stat_complete"
 
+	// Board column titles and relative due labels.
+	KeyBoardAll      Key = "board_all"
+	KeyBoardDueToday Key = "board_due_today"
+	KeyBoardOverdue  Key = "board_overdue"
+	KeyDueToday      Key = "due_today"
+	KeyDueTomorrow   Key = "due_tomorrow"
+	KeyDueYesterday  Key = "due_yesterday"
+	KeyDueInDays     Key = "due_in_days"
+	KeyDueDaysAgo    Key = "due_days_ago"
+
 	// Column / field labels.
 	KeyColID         Key = "col_id"
 	KeyColStatus     Key = "col_status"
@@ -104,6 +114,14 @@ var catalog = map[string]map[Key]string{
 		KeyStatBlocked:        "%d blocked",
 		KeyStatTodo:           "%d todo",
 		KeyStatComplete:       "%d%% complete",
+		KeyBoardAll:           "All tasks",
+		KeyBoardDueToday:      "Due today",
+		KeyBoardOverdue:       "Overdue tasks",
+		KeyDueToday:           "due today",
+		KeyDueTomorrow:        "due tomorrow",
+		KeyDueYesterday:       "due yesterday",
+		KeyDueInDays:          "due in %d days",
+		KeyDueDaysAgo:         "due %d days ago",
 		KeyColID:              "ID",
 		KeyColStatus:          "STATUS",
 		KeyColPrio:            "PRIO",
@@ -158,6 +176,14 @@ var catalog = map[string]map[Key]string{
 		KeyStatBlocked:        "%d bloquée(s)",
 		KeyStatTodo:           "%d à faire",
 		KeyStatComplete:       "%d%% terminé",
+		KeyBoardAll:           "Toutes les tâches",
+		KeyBoardDueToday:      "Pour aujourd'hui",
+		KeyBoardOverdue:       "En retard",
+		KeyDueToday:           "échéance aujourd'hui",
+		KeyDueTomorrow:        "échéance demain",
+		KeyDueYesterday:       "échéance hier",
+		KeyDueInDays:          "échéance dans %d jours",
+		KeyDueDaysAgo:         "en retard de %d jours",
 		KeyColID:              "ID",
 		KeyColStatus:          "STATUT",
 		KeyColPrio:            "PRIO",
