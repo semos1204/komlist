@@ -238,10 +238,14 @@ func relativeDue(now, due time.Time) string {
 }
 
 // daysBetween counts whole calendar days between two instants, positive
-// when `to` is in the future.
+// when `to` is in the future. Each instant's calendar date is read in its
+// own location (due dates are stored as UTC midnight, "now" is local), then
+// both dates are anchored in UTC so the difference is an exact multiple of
+// 24h — anchoring them in their own zones made a due date of yesterday read
+// as "today" east of UTC, because -23h truncated to 0 days.
 func daysBetween(from, to time.Time) int {
-	fromDay := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
-	toDay := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location())
+	fromDay := time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, time.UTC)
+	toDay := time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, time.UTC)
 	return int(toDay.Sub(fromDay).Hours() / 24)
 }
 
@@ -251,31 +255,6 @@ func sameDay(a, b time.Time) bool {
 
 // Recur renders a recurrence marker like "⟳ weekly".
 func Recur(r task.Recurrence) string { return FooterStyle.Render("⟳ " + string(r)) }
-
-// TaskLine renders a task on a single line: "bullet id title prio due recur".
-// Used by the CLI board view; the TUI uses the left/right split below to
-// right-align tag pills.
-func TaskLine(t task.Task, blocked bool) string {
-	parts := []string{Bullet(t.Status), ID(t.ID)}
-	if blocked {
-		parts = append(parts, "\U0001F512")
-	}
-	title := t.Title
-	if t.Status == task.StatusDone {
-		title = DoneStyle.Render(title)
-	}
-	parts = append(parts, title)
-	if prio := Priority(t.Priority); prio != "" {
-		parts = append(parts, prio)
-	}
-	if t.DueAt != nil {
-		parts = append(parts, Due(*t.DueAt))
-	}
-	if t.Recur != task.RecurNone {
-		parts = append(parts, Recur(t.Recur))
-	}
-	return strings.Join(parts, " ")
-}
 
 // TaskLineLeft returns the left-aligned half of a TUI row: bullet, id,
 // optional lock, priority dot, and title. The right half (tags + due +

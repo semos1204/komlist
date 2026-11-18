@@ -190,26 +190,33 @@ cycle covers the keyword cadences.
 
 ### Board view
 
-`kl board` is a colored, taskbook-style view grouping tasks by tag, each
-group ordered by urgency, with a completion footer. `kl list` stays the
-plain, scriptable table.
+`kl board` is a colored, topydo-style view of bordered columns: all
+tasks, open tasks due today, overdue tasks, then one column per tag. Each
+column is ordered by urgency, each task is a card with an urgency bar
+(red overdue, amber due within three days, green otherwise). Columns
+wrap onto extra rows when the terminal is too narrow (width taken from
+the terminal, else `$COLUMNS`, else 120). `kl list` stays the plain,
+scriptable table.
 
 ```console
-$ kl board               # all tasks, grouped by tag
-$ kl board travail       # only the "travail" board
+$ kl board               # all columns
+$ kl board travail       # travail, due today, overdue — travail tasks only
 $ kl board --status todo # only pending items
 ```
 
 ```
- perso
-  4. ☐ acheter du pain ⚑ 2026-06-02 ⟳weekly
-  3. ✔ acheter du pain ⟳weekly
-
- travail
-  1. ☐ clean bdd 30j ·high ⚑ 2026-06-30
-  2. ▶ migrate API
-
- 1 done · 1 doing · 2 todo — 25% complete
+┌──────────────────────────────┐┌──────────────────────────────┐┌──────────────────────────────┐
+│        All tasks (2)         ││        Due today (1)         ││      Overdue tasks (0)       │
+│──────────────────────────────││──────────────────────────────││──────────────────────────────│
+│▌   1 ○ (H) clean bdd 30j     ││▌   1 ○ (H) clean bdd 30j     ││                              │
+│▌       +travail              ││▌       +travail              ││                              │
+│▌       due today             ││▌       due today             ││                              │
+│╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││                              │
+│▌   2 ◉ migrate API           ││                              ││                              │
+│▌       +travail              ││                              ││                              │
+│╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌││                              ││                              │
+└──────────────────────────────┘└──────────────────────────────┘└──────────────────────────────┘
+ 0 done · 1 doing · 1 todo — 0% complete
 ```
 
 Colors are disabled automatically when output is piped or `NO_COLOR` is set.
